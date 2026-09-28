@@ -45,6 +45,7 @@ jobs:
       REVISION: ci-${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+      - run: python3 deploy/test_check_hosting.py
       - run: docker compose -f compose.hosting.yml up --build -d --wait --wait-timeout 120
       - run: python3 deploy/check-hosting.py
       - if: failure()

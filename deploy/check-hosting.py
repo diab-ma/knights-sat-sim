@@ -99,7 +99,10 @@ def main() -> None:
     )
     for container in containers:
         config = container["HostConfig"]
-        assert container["Config"]["User"] not in ("", "0", "root")
+        user = container["Config"]["User"].partition(":")[0]
+        assert user not in ("", "root") and not (
+            user.isdecimal() and int(user) == 0
+        ), "Container must specify a non-root user"
         assert config["ReadonlyRootfs"] and config["CapDrop"] == ["ALL"]
         assert "no-new-privileges:true" in config["SecurityOpt"]
         assert config["Memory"] > 0 and config["NanoCpus"] > 0
