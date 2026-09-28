@@ -69,15 +69,21 @@ def get(path: str) -> tuple[int, str, bytes]:
         return response.status, response.headers.get_content_type(), response.read()
 
 
-def check_origin() -> None:
+def check_origin(maintenance: bool = False) -> None:
     status, kind, body = get("/")
-    assert status == 200 and kind == "text/html" and b'id="root"' in body
+    if maintenance:
+        assert status == 503 and b"Temporarily unavailable" in body
+    else:
+        assert status == 200 and kind == "text/html" and b'id="root"' in body
     assert get("/challenges/hello")[2] == body, "SPA navigation failed"
     status, kind, body = get("/health")
     assert status == 200 and kind == "application/json"
     assert json.loads(body) == {"status": "ok"}
     status, kind, _ = get("/api/hosting-check-missing")
-    assert status == 404 and kind == "application/json", "API reached SPA fallback"
+    if maintenance:
+        assert status == 503, "API is not in maintenance"
+    else:
+        assert status == 404 and kind == "application/json", "API reached SPA fallback"
     for path in (
         "/assets/missing.js",
         "/raw/test",
@@ -90,8 +96,8 @@ def check_origin() -> None:
     print("PASS: built UI, SPA routes, backend health, API proxy, restricted paths")
 
 
-def main() -> None:
-    check_origin()
+def main(maintenance: bool = False) -> None:
+    check_origin(maintenance)
     containers = json.loads(
         subprocess.check_output(
             ["docker", "inspect", "knightsat-server-1", "knightsat-web-1"], text=True
@@ -146,9 +152,11 @@ if __name__ == "__main__":
         check_public()
     elif sys.argv[1:] == ["--origin-only"]:
         check_origin()
+    elif sys.argv[1:] == ["--maintenance"]:
+        main(maintenance=True)
     elif not sys.argv[1:]:
         main()
     else:
         raise SystemExit(
-            "Usage: python3 deploy/check-hosting.py [--public|--origin-only]"
+            "Usage: python3 deploy/check-hosting.py [--public|--origin-only|--maintenance]"
         )

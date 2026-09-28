@@ -63,7 +63,7 @@ For external setup without a code change, meet the ticket's acceptance checks, r
 
 ## Updating the shared website
 
-Merging code does not automatically update the hosted demo. The planned **Update website** workflow is manually triggered and refuses to run while someone owns a Player session. See the [deployment rules](docs/specs/backend-and-simulation.md#updating-the-hosted-demo). This workflow has not been implemented yet.
+Merging code does not automatically update the hosted demo. The **Update website** workflow is manually triggered and currently accepts only the qualified placeholder build inputs. Player-session deployment remains blocked until atomic busy refusal and admission/maintenance integration are implemented. See the [deployment rules](docs/specs/backend-and-simulation.md#updating-the-hosted-demo). See the README operator runbook for setup and recovery.
 
 ## Specs and language
 

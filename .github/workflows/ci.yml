@@ -46,6 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 deploy/test_check_hosting.py
+      - run: python3 deploy/test_release.py
       - run: docker compose -f compose.hosting.yml up --build -d --wait --wait-timeout 120
       - run: python3 deploy/check-hosting.py
       - if: failure()
@@ -72,3 +73,55 @@ jobs:
       - run: cp deploy/cloudflared-jwt_test.go upstream-cloudflared/ingress/middleware/knightsat_test.go
       - run: go test ./ingress/middleware -run TestKnightSatJWT -v
         working-directory: upstream-cloudflared
+
+  publish:
+    name: Publish revision images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [server, ui, hosting, access-validator]
+    concurrency:
+      group: publish-${{ github.sha }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REVISION: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build, test and publish the exact images
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          sha = os.environ['REVISION']
+          release = {'revision': sha}
+          prefix = 'ghcr.io/' + os.environ['GITHUB_REPOSITORY'].lower()
+          def run(*args):
+              return subprocess.check_output(args, text=True).strip()
+          tag_suffix = sha + '-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
+          run('docker', 'compose', '-f', 'compose.hosting.yml', 'build')
+          run('docker', 'compose', '-f', 'compose.hosting.yml', 'up', '-d', '--no-build', '--wait', '--wait-timeout', '120')
+          subprocess.run(['python3', 'deploy/check-hosting.py'], check=True)
+          for service in ('server', 'web'):
+              tag = f'{prefix}-{service}:{tag_suffix}'
+              local = f'knightsat-{service}:{sha}'
+              info = json.loads(run('docker', 'inspect', local))[0]
+              assert info['Config']['Labels']['org.opencontainers.image.revision'] == sha
+              run('docker', 'tag', local, tag)
+              run('docker', 'push', tag)
+              refs = json.loads(run('docker', 'inspect', tag))[0]['RepoDigests']
+              release[service] = next(r.split('@')[1] for r in refs if r.startswith(f'{prefix}-{service}@'))
+          Path('release.json').write_text(json.dumps(release)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.run_attempt }}
+          path: release.json
+          retention-days: 90
+      - if: always()
+        run: docker compose -f compose.hosting.yml down

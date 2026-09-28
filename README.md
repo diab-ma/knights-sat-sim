@@ -51,3 +51,5 @@ Pull requests run the same checks in GitHub Actions.
 ## How we work
 
 Jira holds build tickets. Open a branch named with the Jira key, open a pull request whose title starts with that key, wait for CI, and get one teammate review before merge. Details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+

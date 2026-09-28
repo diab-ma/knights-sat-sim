@@ -3,11 +3,13 @@ name: knightsat
 
 services:
   server:
-    image: knightsat-server:${REVISION:?Set REVISION to identify this build}
+    image: ${SERVER_IMAGE:-knightsat-server:${REVISION:?Set REVISION to identify this build}}
     build:
       context: .
       dockerfile: deploy/Dockerfile
       target: server
+      args:
+        REVISION: ${REVISION}
     restart: unless-stopped
     init: true
     read_only: true
@@ -35,11 +37,13 @@ services:
       options: {max-size: 10m, max-file: "3"}
 
   web:
-    image: knightsat-web:${REVISION:?Set REVISION to identify this build}
+    image: ${WEB_IMAGE:-knightsat-web:${REVISION:?Set REVISION to identify this build}}
     build:
       context: .
       dockerfile: deploy/Dockerfile
       target: web
+      args:
+        REVISION: ${REVISION}
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -52,6 +56,8 @@ services:
       - "127.0.0.1:8080:8080"
     tmpfs:
       - /tmp:size=32m,mode=1777
+    volumes:
+      - ${STATE_DIR:-./deploy/state}:/maintenance:ro
     networks: [frontend, backend]
     depends_on:
       server:

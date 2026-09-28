@@ -7,6 +7,9 @@ COPY server/sim ./sim
 RUN uv sync --locked --no-dev --no-editable
 
 FROM python:3.12-slim AS server
+ARG REVISION
+LABEL org.opencontainers.image.revision=$REVISION
+LABEL org.opencontainers.image.source="https://github.com/kamillamamatova/knight-sat-sim"
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY --from=server-build /app /app
@@ -20,9 +23,13 @@ WORKDIR /app
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci
 COPY ui/ ./
-RUN npm run build
+ARG REVISION
+RUN npm run build && printf "%s\n" "$REVISION" > dist/revision.txt
 
 FROM nginxinc/nginx-unprivileged:stable-alpine AS web
+ARG REVISION
+LABEL org.opencontainers.image.revision=$REVISION
+LABEL org.opencontainers.image.source="https://github.com/kamillamamatova/knight-sat-sim"
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=web-build /app/dist /usr/share/nginx/html
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

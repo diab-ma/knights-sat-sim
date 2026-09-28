@@ -1,0 +1,82 @@
+name: Update website
+run-name: Update website to ${{ inputs.revision }}
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Full 40-character tested main commit SHA (placeholder only)
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+  packages: read
+concurrency:
+  group: update-website-production
+  cancel-in-progress: false
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify selected revision before connecting
+        env:
+          SELECTED: ${{ inputs.revision }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'deploy')
+          from release import select
+          release = select(os.environ['SELECTED'], os.environ['GH_TOKEN'], Path('deploy/bootstrap.sha256').read_text().strip())
+          print('Selected tested release:', release['revision'], release['run'])
+          PY
+      - name: Join private deployment network
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:knightsat-deploy
+          ping: ${{ vars.DEPLOY_HOST }}
+      - name: Update and verify the private origin
+        env:
+          SELECTED: ${{ inputs.revision }}
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST_KEY: ${{ vars.DEPLOY_HOST_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/knightsat-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/knightsat-ssh/key"
+          printf '%s\n' "$HOST_KEY" > "$RUNNER_TEMP/knightsat-ssh/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/knightsat-ssh/key"' EXIT
+          python3 - <<'PY'
+          import json, os, subprocess
+          root = os.environ['RUNNER_TEMP'] + '/knightsat-ssh/'
+          subprocess.run(['ssh', '-T', '-i', root+'key', '-o', 'IdentitiesOnly=yes',
+                          '-o', 'StrictHostKeyChecking=yes', '-o', 'BatchMode=yes',
+                          '-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=15',
+                          '-o', 'ServerAliveCountMax=8', '-o', 'UserKnownHostsFile='+root+'known_hosts',
+                          'knightsat-deploy@' + os.environ['DEPLOY_HOST']],
+                         input=json.dumps({'revision': os.environ['SELECTED'],
+                                           'token': os.environ['GH_TOKEN']})+'\n',
+                         text=True, check=True, timeout=900)
+          PY
+      - name: Verify anonymous Access denial
+        run: python3 deploy/check-hosting.py --public
+      - name: Record deployment
+        env:
+          SELECTED: ${{ inputs.revision }}
+        run: printf 'Deployed `%s`; origin revision, health, retained volume and anonymous Access denial verified.\n' "$SELECTED" >> "$GITHUB_STEP_SUMMARY"

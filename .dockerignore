@@ -10,3 +10,5 @@
 **/*.sqlite
 **/*.sqlite3
 data
+
+deploy/state
