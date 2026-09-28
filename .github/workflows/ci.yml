@@ -116,6 +116,10 @@ jobs:
               run('docker', 'push', tag)
               refs = json.loads(run('docker', 'inspect', tag))[0]['RepoDigests']
               release[service] = next(r.split('@')[1] for r in refs if r.startswith(f'{prefix}-{service}@'))
+              immutable = f'{prefix}-{service}@{release[service]}'
+              run('docker', 'pull', immutable)
+              pulled = json.loads(run('docker', 'inspect', immutable))[0]
+              assert pulled['Id'] == info['Id'], 'Registry image differs from tested image'
           Path('release.json').write_text(json.dumps(release)+'\n')
           PY
       - uses: actions/upload-artifact@v4
