@@ -37,3 +37,38 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+  hosting:
+    name: Private hosting build and smoke checks
+    runs-on: ubuntu-latest
+    env:
+      REVISION: ci-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 deploy/test_check_hosting.py
+      - run: docker compose -f compose.hosting.yml up --build -d --wait --wait-timeout 120
+      - run: python3 deploy/check-hosting.py
+      - if: failure()
+        run: docker compose -f compose.hosting.yml logs
+      - if: always()
+        run: docker compose -f compose.hosting.yml down
+
+  access-validator:
+    name: Access JWT validator cases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: false
+      # Installed connector 2026.9.3. Fixture keys never reach the live tunnel.
+      - uses: actions/checkout@v4
+        with:
+          repository: cloudflare/cloudflared
+          ref: 96d39adbc812dc7363834bda908970c1a2560a72
+          path: upstream-cloudflared
+          persist-credentials: false
+      - run: cp deploy/cloudflared-jwt_test.go upstream-cloudflared/ingress/middleware/knightsat_test.go
+      - run: go test ./ingress/middleware -run TestKnightSatJWT -v
+        working-directory: upstream-cloudflared
