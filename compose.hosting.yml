@@ -1,0 +1,75 @@
+# Private hosting validation. Do not combine with docker-compose.yml.
+name: knightsat
+
+services:
+  server:
+    image: knightsat-server:${REVISION:?Set REVISION to identify this build}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: server
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1.0
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    environment:
+      SQLITE_PATH: /data/progress.sqlite
+    volumes:
+      - progress:/data
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks: [backend]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: "3"}
+
+  web:
+    image: knightsat-web:${REVISION:?Set REVISION to identify this build}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: web
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.25
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 64
+    ports:
+      - "127.0.0.1:8080:8080"
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks: [frontend, backend]
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: "3"}
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  progress:
