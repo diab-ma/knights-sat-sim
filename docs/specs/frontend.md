@@ -1,5 +1,18 @@
 # Frontend
 
+## Read this for browser work
+
+This is the agreement for the UI we are building. Start in `ui/src/App.tsx`; it is currently a placeholder. Do not assume the libraries in the table below are installed yet.
+
+| Ticket | First deliverable | Shared boundary |
+| --- | --- | --- |
+| KSAT-36 (Diab) | Reusable controls and workstation layout | Other UI tickets use these components. |
+| KSAT-9 (Sydney) | Challenge list, API client, generated types, local API proxy | Kamilla owns the API schemas; coordinate CI edits with Diab. |
+| KSAT-12 / KSAT-31 (Kamilla) | One shared session provider / reconnect handling | Panels read the same server state; do not open separate event connections. |
+| KSAT-13 / KSAT-14 / KSAT-32 (Lily) | Terminal / editor / file browser | Denzel supplies the gateway (38) and file API (39). |
+
+Read the relevant section, then its acceptance checks. **Provider** means shared React state available to child components; **reducer** means a function that calculates the next state from an action. See the [glossary](../glossary.md) for other terms.
+
 This spec owns the shared UI foundation and browser conventions for the operations MVP. Start with the [project plan](project-plan.md). The foundation, behavior and implementation defaults below are agreed requirements. The current UI remains a scaffold.
 
 ## Shared UI foundation
@@ -29,7 +42,11 @@ The first demo supports desktop use, targeting widths of 1280px and above. Below
 
 ## Operations interaction choices
 
-Hello, Satellite! introduces a supplied terminal command. Ready for the Pass uses graphical controls for station preparation; keep the terminal/editor/files available alongside them. The pass begins on demand after preparation, with scenario time clearly distinguished from wall-clock time. Preparation includes satellite, pass time, receiving frequency, receiving mode, an automatic-tracking control and Check setup feedback. Use the [agreed setup behavior](ground-station-training.md#ready-for-the-pass-agreed-interaction); Catch and Log uses the editor and terminal to adapt/run a Python starter, then an editor-based log template with prefilled session details and Player-entered results. Use the [scenario/file defaults](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) for exact context, readings and evidence. Catch exposes Receiver ready, Start pass, pass progress, saved-file selection and Check work; completion feedback distinguishes verified work from successfully saved progress. Downloads use saved file contents. Do not add a PING button, packet-building form or Flag entry box.
+Hello, Satellite! introduces a supplied terminal command. Ready for the Pass uses graphical controls for station preparation; keep the terminal/editor/files available alongside them. The pass begins on demand after preparation, with scenario time clearly distinguished from wall-clock time.
+
+Preparation includes satellite, pass time, receiving frequency, receiving mode, an automatic-tracking control and Check setup feedback. Use the [agreed setup behavior](ground-station-training.md#ready-for-the-pass-agreed-interaction); Catch and Log uses the editor and terminal to adapt/run a Python starter, then an editor-based log template with prefilled session details and Player-entered results. Use the [scenario/file defaults](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) for exact context, readings and evidence.
+
+Catch exposes Receiver ready, Start pass, pass progress, saved-file selection and Check work; completion feedback distinguishes verified work from successfully saved progress. Downloads use saved file contents. Do not add a PING button, packet-building form or Flag entry box.
 
 ## Navigation and active Attempt
 

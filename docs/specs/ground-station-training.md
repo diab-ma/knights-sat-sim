@@ -1,5 +1,20 @@
 # Ground-station training
 
+## Read this for Ready and Catch
+
+For the software demo, read only through [MVP acceptance checks](#mvp-acceptance-checks). The later PSB sections are a separate roadmap, not extra work for these tickets.
+
+| Part | Ticket | Starting point |
+| --- | --- | --- |
+| Setup validation API | KSAT-40, Kamilla | Add to the session API from KSAT-12. |
+| Setup controls and explanations | KSAT-18, Sydney | Reuse shared controls and the API from KSAT-40. |
+| Move verified setup into Catch | KSAT-19, Kamilla | Reuse the replacement operation from KSAT-15. |
+| Deliver the short pass to Python | KSAT-20, Diab | Extend Sim/Link and `player/python/kss_client.py`. |
+| Guide the learner through recording and a log | KSAT-21, Lily | Reuse editor/files and Check work from KSAT-22. |
+| Verify saved evidence | KSAT-22, Kamilla | Reuse safe file access from KSAT-39. |
+
+A **pass** here is a fixed teaching sequence of 12 packets, started by the learner. It does not wait for a real satellite. A **recording** stores those packets; a **log** explains their context and readings. Exact values and file fields below let each teammate build against the same example.
+
 ## Goal
 
 Teach people to operate a ground station and prepare them to use the PSB station at UCF. A Player should understand what each piece of equipment does and be able to work through a station session: prepare, track, receive, decode, save results, and shut down.
@@ -24,7 +39,11 @@ Completion follows successful performance of the required task. Show the accompl
 
 Keep the integrated terminal, code editor and shared files in the MVP. Their existing execution, storage and access guarantees remain requirements; Hello uses a supplied terminal command. Ready for the Pass uses graphical station controls to select the satellite and receiving settings, while the terminal remains available for inspecting configuration and running tools. Catch and Log uses the code editor, terminal and shared files, followed by an editor-based session log.
 
-Ready for the Pass and Catch and Log follow the same practice pass: preparation establishes the context for reception and logging. Each exercise can also be repeated from a prepared starting point without requiring the Player to redo the entire sequence. The practice pass starts on demand once preparation is complete. The Player checks the scheduled time in the supplied brief, but does not wait for a real-world clock or miss a pass while reading instructions. Label scenario time separately from real time. Unlock Hello → Ready for the Pass → Catch and Log using shared demo progress. Completed Challenges remain available to repeat. Repeating Catch and Log supplies the prepared station configuration without requiring another completion of Ready for the Pass. The pass defaults below define handoff, pacing and recovery.
+Ready for the Pass and Catch and Log follow the same practice pass: preparation establishes the context for reception and logging. Each exercise can also be repeated from a prepared starting point without requiring the Player to redo the entire sequence. The practice pass starts on demand once preparation is complete.
+
+The Player checks the scheduled time in the supplied brief, but does not wait for a real-world clock or miss a pass while reading instructions. Label scenario time separately from real time. Unlock Hello → Ready for the Pass → Catch and Log using shared demo progress.
+
+Completed Challenges remain available to repeat. Repeating Catch and Log supplies the prepared station configuration without requiring another completion of Ready for the Pass. The pass defaults below define handoff, pacing and recovery.
 
 ### Ready for the Pass: agreed interaction
 

@@ -1,119 +1,95 @@
 # Knight Sat Sim
 
-A **Platform** for practicing satellite cybersecurity and learning ground-station operation, including the station at UCF’s Physical Sciences Building (PSB). **Players** practice with simulated systems and learn the equipment and workflow used at PSB.
+A UCF Senior Design project for practicing satellite communication in a browser. The satellite is simulated: this demo does not connect to a real spacecraft or radio.
 
-This repository is **Knight Sat Sim (KSS)**, the UCF CS Senior Design implementation of that Platform. The product has three tracks: **Basic operations**, **Offensive**, and **Defensive**. The first version to build (MVP) focuses on **three Basic operations Challenges**, **Hello, Satellite!**, **Ready for the Pass**, and **Catch and Log**. Completion is based on performing the tasks, without submitting Flags. The specs define the agreed learning flow and implementation defaults. Offensive and Defensive Challenges come later. Practice remains browser-based, without live station-hardware integration. See the [ground-station training plan](docs/specs/ground-station-training.md).
+The first version has three planned activities: **Hello, Satellite!** (send PING and inspect the reply), **Ready for the Pass** (configure a receiving station), and **Catch and Log** (use Python to receive and save simulated telemetry).
 
-Start with the [project plan](docs/specs/project-plan.md) for scope, responsibilities, progression, and completion checks. Its [build specifications](docs/specs/project-plan.md#build-specifications) table links to the implementation and learning documents. Each spec owns its decisions; research provides supporting sources, not additional MVP requirements.
+## Start here
 
-## Repository layout
+You do not need AI, an agent, radio equipment, or server access to contribute. You need a code editor, Git, Docker, and access to the team's GitHub repository and Jira board.
 
-| Path | Contents |
+1. Follow **Run locally** below and check the expected result.
+2. Read the short [project plan](docs/specs/project-plan.md) to understand the parts and team responsibilities.
+3. Follow [Contributing](CONTRIBUTING.md) to take one Jira ticket through a branch, tests, pull request, and deployment.
+4. Read only the specification sections linked by your ticket. The [documentation map](docs/README.md) explains where to find details.
+
+## What works today
+
+As of 2026-09-29:
+
+| Available | Still being built |
 | --- | --- |
-| `server/sim/` | Sim Service, packet handling, Ground Sim, and Software Link |
-| `server/api/` | FastAPI Web Backend |
-| `ui/` | React and TypeScript frontend |
-| `docs/specs/` | Current scope, architecture, behavior, and acceptance checks |
-| `docs/research/` | Supporting sources and technical findings |
+| Local UI placeholder and server health check | Challenge pages, saved progress, and browser session controls |
+| Isolated Player runtime controller, with real Docker tests | Browser terminal, editor, files, and their application integration |
+| Automatic deployment after successful checks on `main` | The three complete learning activities and final hosted acceptance |
 
-The repository currently contains a scaffold. Running it starts the frontend and backend health endpoint; it does not provide the planned Challenges, terminal, database behavior, or station lessons yet.
+A placeholder page is the expected result of setup. Specifications describe the product to build; they are not claims that all features work. Jira is the source for current ticket status.
 
 ## Run locally
 
-You need Docker. From the repository root:
+Install Git and Docker Desktop for your operating system. Start Docker Desktop and wait until its engine is running. On Linux, Docker Engine with the Compose plugin also works.
+
+Open a terminal in the folder where you keep projects, then run:
 
 ```bash
+git clone https://github.com/senior-design-organization/knights-sat-sim.git
+cd knights-sat-sim
 docker compose up --build
 ```
 
-- Browser UI: http://localhost:5173
-- Web Backend health check: http://localhost:8000/health
+If you already cloned the project, open a terminal in that folder and run only the last command. The first build downloads dependencies and may take several minutes. Leave this terminal running.
 
-Compose starts the React development server and **one** Python process that will contain FastAPI and the Sim Service. The `sqlite-data` volume is reserved for the planned SQLite progress database. Do not run extra server workers: the MVP Attempt lives in memory in that single process.
+Open these addresses on **your computer**:
 
-Without Docker:
+- [UI: localhost:5173](http://localhost:5173) — a page headed “Satellite Security Challenge Platform.”
+- [Server check: localhost:8000/health](http://localhost:8000/health) — `{"status":"ok"}`. This confirms the server responds; it does not test the planned Challenges.
 
-- Server: Python 3.12+, from `server/`: `uv sync` then `uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000` (still one worker).
-- UI: Node 22+, from `ui/`: `npm install` then `npm run dev`.
+Use current stable desktop Google Chrome for required browser checks. The planned workstation targets windows at least 1280 pixels wide.
+
+To stop, press **Ctrl+C** in the running terminal, then run `docker compose down`. Do **not** add `-v` to this normal development command: that would delete its stored volumes, including future local progress.
+
+UI source edits reload automatically. After server or dependency changes, stop and run `docker compose up --build` again. Keep one Python server worker; session state will live in that process.
+
+### If setup fails
+
+| Symptom | Next step |
+| --- | --- |
+| `git` or `docker` not found | Install the missing tool, then reopen the terminal. |
+| Cannot connect to the Docker daemon | Start Docker Desktop and wait for the engine. |
+| No configuration file found | Run `pwd` (PowerShell: `Get-Location`). Change into the cloned folder containing `docker-compose.yml`. |
+| Port 5173 or 8000 is already in use | Stop the other development copy or application using that port, then retry. |
+| Page unavailable | Keep Compose running; inspect `docker compose ps` and `docker compose logs --tail=100`. |
+| Docker build fails | Read the first error above the final failure. Share that error and your OS with a teammate; remove secrets before sharing logs. |
+
+For an editor with local dependencies, or to work without Docker for UI/API changes, see [native development](docs/development.md#run-without-compose).
 
 ## Tests and lint
 
-```bash
-# server
-cd server && uv sync --extra dev && uv run ruff check . && uv run pytest
+Run the [test commands](docs/development.md#tests-and-lint) for the area you changed before opening a pull request. That guide includes Python/Node setup, expected results, and the separate real-container runtime tests. A successful website startup alone is not a test pass.
 
-# ui
-cd ui && npm ci && npm run lint && npm test
-```
+## Repository layout
 
-Pull requests run the same checks in GitHub Actions.
+| Path | What belongs here |
+| --- | --- |
+| `ui/src/` | React/TypeScript browser interface; currently a small placeholder |
+| `server/api/` | Python HTTP API and existing runtime/bridge infrastructure |
+| `server/sim/` | Planned simulation and packet code; currently a placeholder |
+| `server/tests/` | Server tests, including the real Docker runtime harness |
+| `player/` | Image and helper library for the Player's isolated Python environment |
+| `deploy/`, `.github/workflows/` | Hosting checks and automatic build/deployment |
+| `docs/specs/` | Agreed behavior, shared interfaces, and acceptance checks |
+| `docs/research/` | Background sources; not extra work for the first demo |
+
+The [glossary](docs/glossary.md) explains project and development terms. The [documentation map](docs/README.md) separates everyday contributor instructions from detailed specifications and server administration.
 
 ## How we work
 
-Jira holds build tickets. Open a branch named with the Jira key, open a pull request whose title starts with that key, wait for CI, and follow the review rules (including Diab's authorization for his own merges). Details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Use [Jira](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1), not GitHub Issues, for build tickets. Keep each ticket small, use a short-lived branch, and agree on shared API shapes before implementing both sides. Follow the [complete contributor workflow](CONTRIBUTING.md).
 
+A merge to `main` runs automated checks, publishes tested images, and triggers **Update website**. The [shared website](https://knightsat.radio-ranger.com) is for internal development and requires an approved email address. Updates may interrupt sessions or unsaved work. The GitHub environment is named `production` for historical configuration reasons; this is still a development site.
 
 ## Local Player runtime checks (KSAT-11)
 
-The isolated runtime controller is available to server code; browser Start/Stop and
-production Sim wiring remain KSAT-12. The default development and hosted services
-still serve the scaffold. This harness uses **local Docker only** and does not
-change the hosted demo or its deployment fingerprint.
+The [runtime test guide](docs/development.md#local-player-runtime-checks-ksat-11) runs disposable local containers. It does not change the shared website.
 
-```bash
-docker build -t knightsat-player:ksat11 player
-docker compose -p ksat11-test -f compose.runtime-test.yml build
-docker compose -p ksat11-test -f compose.runtime-test.yml run --rm runtime-tests
-# Remove only the disposable harness volumes/network after the tests finish:
-docker compose -p ksat11-test -f compose.runtime-test.yml down -v
-```
-
-Run one behavior by appending `pytest tests/runtime/test_controller.py -k <name> -v`
-to the `run --rm runtime-tests` command. Run the harness serially: its three named
-volumes belong to one test deployment. The trusted test server has the local Docker
-socket; the Player never receives it. The test image uses the server lockfile.
-Ordinary `uv run --extra dev pytest` skips real-container checks without the harness
-environment; CI runs them in a dedicated required-for-publishing job. Typecheck with
-`uv run --extra dev mypy --ignore-missing-imports api` from `server/`.
-
-The harness's three deployment-labelled named volumes are bounded tmpfs and remain
-mounted in the trusted server throughout each test. Runtime replacement preserves
-authored contents. Session cleanup empties personal data and removes execution,
-including detached processes, temporary/home files and the PTY. Empty infrastructure
-volumes remain attached until `down -v`; they contain no retained personal data.
-Do not use a broad Docker prune command. If a test process is killed, inspect only
-containers with `org.knightsat.deployment=ksat11-test`, record their runtime labels,
-and deliberately remove those identified test containers before removing the
-harness volumes. A failed cleanup must not be treated as successful admission.
-
-Local evidence, 2026-09-29 UTC: Docker Desktop 4.93.0, Engine 29.8.1,
-Linux ARM64, 10 CPUs / approximately 7.75 GiB Docker VM memory. Real Player probes
-verified UID/GID 1000, network none, read-only root/resources, dropped capabilities,
-no-new-privileges and 0.5 CPU / 128 MiB / no extra swap / 64 processes / 256 descriptors.
-Observed exhaustion: authored/tmp/home writes stopped at 67,108,864 / 16,777,216 /
-4,194,304 bytes; managed and bridge storage rejected writes beyond 1 MiB; process
-creation and descriptor opens hit kernel limits; CPU throttling occurred; an
-unbounded allocator was killed with status 137. Exact available child/descriptor
-counts include the shell and bridge overhead, so they may vary.
-
-The checks also cover retained authored files, fresh read-only managed context,
-non-overwriting/symlink-safe provisioning, quota-failure recovery, detached-child
-removal, failed/lost Docker responses, cancellation during creation, abandoned
-runtime refusal, foreign-resource preservation, denied IPv4/IPv6 egress/private
-paths, direct-socket and loopback authentication, denied non-script routes, revoked
-queued traffic, receive routing and the 256-byte input bound. Bridge fixtures
-prove infrastructure transport only; they do not claim Sim/Link completion or
-receiver readiness. No browser journey or HP x86-64 hosted capacity was tested here.
-
-Final local verification: all 20 server tests passed with real Docker, plus the UI
-test/build, Python/TypeScript type checks, lint and five deployment-tool regression
-checks. Standards and spec reviews found no remaining issues after the close-race
-and cleanup-fault regressions were added.
-
-KSAT-12 supplies real Sim handlers, browser ownership and the shared lifecycle lock;
-KSAT-37 supplies startup reconciliation, maintenance and readiness. KSAT-13 drains
-the existing PTY into its bounded terminal buffers. KSAT-17/20 extend
-`player/python/kss_client.py` and provide the authored starter/managed scenario bytes;
-this image currently supplies `load_connection()` and pinned `websockets`, not a
-PING solver or completed recording. See the controller handoff in the
-[Workspace spec](docs/specs/terminal-workspace.md#controller-integration-handoff).
+Diab handles hosting privately. Contributors only need the PR/deployment workflow above; private server administration does not belong in this repository.

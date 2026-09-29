@@ -1,6 +1,23 @@
 # Integrated terminal and Workspace — implementation spec
 
-Status: agreed operations-MVP requirements and implementation defaults, not implemented features.
+## Read this for Workspace work
+
+Think of the Workspace as two parts: **saved files** and a **running Linux environment**. Replacing the environment must not erase saved work unless the action explicitly calls for deletion. Browser tabs also need permission before editing or typing into the terminal.
+
+The controller already exists in `server/api/runtime.py`; its script bridge is in `server/api/script_bridge.py`. The browser terminal, file API, and editor are still application work.
+
+| Ticket | Owns | Reuses |
+| --- | --- | --- |
+| KSAT-11 (completed, Diab) | Container creation, storage, isolation, destruction | Real Docker test harness |
+| KSAT-38 (Denzel) | Authorized terminal WebSocket gateway | Controller's existing shell connection |
+| KSAT-39 (Denzel) | Safe read/save/list/download API | Existing Workspace storage |
+| KSAT-13 / KSAT-14 / KSAT-32 (Lily) | Browser terminal / editor / files and notes | Gateway 38 and file API 39 |
+| KSAT-15 / KSAT-16 / KSAT-33 / KSAT-34 (Denzel) | Restart/switch, Stop/expiry, reopen, reset | Shared lifecycle ownership from KSAT-12 |
+| KSAT-37 (Diab) | Remove abandoned resources before server readiness | Controller and deployment labels |
+
+Start with the [lifecycle table](#lifecycle-and-ordering), then the interface section for your ticket. The [glossary](../glossary.md) explains PTY, runtime, generation, atomic saves, and safe path handling. File authorization and cleanup are part of each feature, not optional later polish.
+
+Status: agreed requirements. The runtime controller/bridge are implemented; the browser/file/lifecycle integrations listed above remain feature work.
 
 Start with the [project plan](project-plan.md). This file owns terminal execution, shared files, tab control, retention, and recovery for the operations MVP. The [operations curriculum](ground-station-training.md#mvp-operations-curriculum) owns the three MVP learning activities; broader PSB lessons are later work.
 
@@ -14,7 +31,11 @@ Provide a real Linux terminal and file editor inside the selected Challenge work
 
 Use replaceable Docker execution with independently retained Workspace storage and an authenticated terminal gateway. Keep the Web Backend and Sim Service together in their existing Python process. One browser owns the active Attempt; one tab within that browser controls terminal input and editing. Explicit Take control transfers that tab role without interrupting programs. Explicit Save and file-version checks protect against stale editor writes.
 
-The first deployment is internal-team-only and must be available at a shared hosted URL, with Player execution on the host. Local Docker development remains supported. Hosting and access follow the [Backend deployment section](backend-and-simulation.md#ownership-and-deployment). The general shell has access only to required Platform endpoints. Hello uses a supplied terminal command to send PING and inspect its reply, without requiring the Player to write Python. Catch and Log uses a short Python starter to receive, record and interpret the practice pass. The mission map remains contextual and does not determine communication availability.
+The first deployment is internal-team-only and must be available at a shared hosted URL, with Player execution on the host. Local Docker development remains supported. Hosting and access follow the [Backend deployment section](backend-and-simulation.md#ownership-and-deployment).
+
+The general shell has access only to required Platform endpoints. Hello uses a supplied terminal command to send PING and inspect its reply, without requiring the Player to write Python. Catch and Log uses a short Python starter to receive, record and interpret the practice pass.
+
+The mission map remains contextual and does not determine communication availability.
 
 ## Implementation Decisions
 
@@ -114,13 +135,21 @@ The requirements and implementation defaults are agreed. The prototype supports 
 
 Use Docker named volumes backed by bounded Linux tmpfs: authored files 64 MiB, managed resources 1 MiB, raw bridge 1 MiB. Keep them mounted in the trusted server so replacing Player execution does not discard files. Mount authored storage read/write at `/workspace`, resources read-only at `/attempt`, bridge read-only at `/bridge` in Player execution. Use UID/GID 1000 for Player files. Host restart may lose these volatile volumes; startup cleans them before reuse. Persistent SQLite lives separately. [Docker volume options](https://docs.docker.com/reference/cli/docker/volume/create/) document the tmpfs-backed named-volume mechanism.
 
-Run Player execution with network `none`, read-only root, all capabilities dropped, no-new-privileges, and the limits above. Prepare Bash, Python, `ls`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `head`, `tail`, `xxd`, `od`, `sha256sum`, the helper, and `socat` in the image. Use a fixed loopback listener at `127.0.0.1:8766` forwarding only to `/bridge/raw.sock`. A second, script-only ASGI listener in the existing Python process serves that Unix socket; expose only `/raw/attempts/{attempt_id}` and `/receive/attempts/{attempt_id}` there, with bearer authentication on every opening handshake. It shares the actual Sim instance. Public API, progress, filesystem and Docker operations never appear on this listener. The Player can reach the socket directly, so security belongs in its handler rather than the forwarding command.
+Run Player execution with network `none`, read-only root, all capabilities dropped, no-new-privileges, and the limits above. Prepare Bash, Python, `ls`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `head`, `tail`, `xxd`, `od`, `sha256sum`, the helper, and `socat` in the image. Use a fixed loopback listener at `127.0.0.1:8766` forwarding only to `/bridge/raw.sock`.
+
+A second, script-only ASGI listener in the existing Python process serves that Unix socket; expose only `/raw/attempts/{attempt_id}` and `/receive/attempts/{attempt_id}` there, with bearer authentication on every opening handshake. It shares the actual Sim instance. Public API, progress, filesystem and Docker operations never appear on this listener.
+
+The Player can reach the socket directly, so security belongs in its handler rather than the forwarding command.
 
 Create one Bash PTY per runtime, starting in `/workspace/{challenge_id}`; Ctrl-C uses the PTY, not a special Python runner. Closing a terminal tab only detaches. A shell exit or container failure marks runtime failed and offers explicit Reopen terminal; it does not automatically launch or rerun anything. Reopen replaces the entire runtime and preserves the current Attempt and authored volume. Runtime destruction always removes detached descendants as well as the visible shell.
 
 **Files.** `workspace_id` identifies the owning session's authored storage: it survives Restart/Switch, changes on Reset workspace, and disappears on Stop/expiry. Provision only missing authored starters: Hello gets `ping_example.py` and `notes.txt`; Ready gets `notes.txt`; Catch gets `main.py` (connection boilerplate with task comments) and `notes.txt`. Files stay in `/workspace/{challenge_id}`. User-created scripts, recordings and logs are never overwritten by provisioning.
 
-Managed, read-only resources: `/attempt/connection.json` holds `{attempt_id, url, credential, protocol: raw|receive}` for Hello/Catch; Ready has no connection file. The URL uses the loopback listener and the current route. Ready/Catch receive `/attempt/pass-brief.json`; Catch also receives `/attempt/log-template.json` with current scenario/pass/setup metadata and null result fields. On each Catch run, instruct the Player to copy this fresh template to a chosen authored log filename before filling it in; if that filename exists, offer a new name or explicit overwrite. Never silently update an old authored log to pretend it belongs to a new pass. The template and brief formats are owned by the operations spec. No completed recording is supplied.
+Managed, read-only resources: `/attempt/connection.json` holds `{attempt_id, url, credential, protocol: raw|receive}` for Hello/Catch; Ready has no connection file. The URL uses the loopback listener and the current route. Ready/Catch receive `/attempt/pass-brief.json`; Catch also receives `/attempt/log-template.json` with current scenario/pass/setup metadata and null result fields.
+
+On each Catch run, instruct the Player to copy this fresh template to a chosen authored log filename before filling it in; if that filename exists, offer a new name or explicit overwrite. Never silently update an old authored log to pretend it belongs to a new pass. The template and brief formats are owned by the operations spec.
+
+No completed recording is supplied.
 
 The helper reads the current managed connection file at invocation, so distributed starters contain no live credentials. The owning browser may inspect managed resources, but the normal UI never logs or exports credentials with a starter/download bundle. Personal files that a Player deliberately puts credentials into remain their own authored content; explain that credentials expire with the Attempt.
 
@@ -135,7 +164,11 @@ All file routes require ownership, a current Attempt and matching `workspace_id`
 
 File versions are opaque SHA-256 digests of actual bytes read from disk, never an API-only counter. Under the per-file save lock, read current content again, compare the supplied version, validate current lifecycle/grant, then write a temporary file and atomically replace within the same checked directory. No success response before the replace succeeds. Quota failure preserves the existing file and removes the temporary file. A concurrent shell writer remains outside that lock, as described above.
 
-Resolve relative paths by walking directory descriptors beneath the selected volume with no symlink following. Reject absolute paths, `..`, NUL, symlinks, non-regular-file reads and special devices/FIFOs; do not rely on a string prefix check or a preflight `resolve()` followed by an unchecked open. Anchor creates/replaces to the checked parent descriptor, recheck context before committing, and close all descriptors. A short shared apply gate serializes the final grant check and replace with control revocation; awaiting a worker must not let an already-revoked save commit later. Rename/delete/new directories are terminal operations for MVP; the editor includes Save as without a separate file-management framework. Refresh the listing on panel focus and after saves; re-read an open file on editor focus to detect shell edits without replacing a dirty draft.
+Resolve relative paths by walking directory descriptors beneath the selected volume with no symlink following. Reject absolute paths, `..`, NUL, symlinks, non-regular-file reads and special devices/FIFOs; do not rely on a string prefix check or a preflight `resolve()` followed by an unchecked open. Anchor creates/replaces to the checked parent descriptor, recheck context before committing, and close all descriptors.
+
+A short shared apply gate serializes the final grant check and replace with control revocation; awaiting a worker must not let an already-revoked save commit later. Rename/delete/new directories are terminal operations for MVP; the editor includes Save as without a separate file-management framework.
+
+Refresh the listing on panel focus and after saves; re-read an open file on editor focus to detect shell edits without replacing a dirty draft.
 
 ### Controller integration handoff
 
@@ -154,8 +187,8 @@ Under KSAT-12's shared lifecycle/admission lock, call
 resources=...)`. File maps contain plain filenames and bytes supplied by the
 Challenge implementation. The return value identifies the runtime and its recorded
 Docker container name. `terminal` is the single existing nonblocking PTY socket;
-`terminal_exec_id` supports Docker resize/exit inspection. KSAT-13 owns draining,
-buffering and authenticated browser attachment; attaching never creates a shell.
+`terminal_exec_id` supports Docker resize/exit inspection. KSAT-38 owns draining,
+buffering and authenticated browser attachment; KSAT-13 owns the browser terminal; attaching never creates a shell.
 
 `api.script_bridge.ScriptBridge` runs its script-only ASGI listener on the same
 server event loop. Bind the active Attempt ID, secret, protocol and actual Sim
@@ -193,7 +226,13 @@ Browser terminal socket: `/api/attempts/{id}/terminal`, authenticated by cookie 
 | Browser → server | `{type: "resize", runtime_id, tab_id, generation, cols, rows}`; bounds 20–300 columns and 5–120 rows. Ctrl-C is ordinary input byte `0x03`. |
 | Server → browser | `{type: "error", code, message}` or `{type: "closed", runtime_id, reason}`. No terminal text becomes an HTML fragment or application event. |
 
-Use xterm's fit addon to compute rows/columns; the controlling tab alone resizes the shared PTY. Limit decoded input to 8 KiB/message, output chunks to 8 KiB and each subscriber queue to 128 KiB. Retain the agreed 128 KiB gateway ring and 1,000-line browser scrollback. Replay output only, with offsets preventing duplicate display. If a retained xterm instance can resume at an available offset, send the exact missing bytes, even across split escape sequences. A fresh xterm can replay safely from byte zero only. If that history is gone or a gap appears, reset its parser, show “Earlier terminal output is unavailable,” and attach at the current tail without replaying a ring that starts mid-sequence; the Player may redraw manually. Do not send a shell command to reconstruct output. Disconnect slow subscribers on queue overflow; continue draining the PTY into the bounded ring. Bound client rendering queues with the same overflow behavior; output floods cannot accumulate unbounded browser memory. Disable automatic terminal hyperlinks, clipboard access and unsupported terminal escape extensions.
+Use xterm's fit addon to compute rows/columns; the controlling tab alone resizes the shared PTY. Limit decoded input to 8 KiB/message, output chunks to 8 KiB and each subscriber queue to 128 KiB. Retain the agreed 128 KiB gateway ring and 1,000-line browser scrollback.
+
+Replay output only, with offsets preventing duplicate display. If a retained xterm instance can resume at an available offset, send the exact missing bytes, even across split escape sequences. A fresh xterm can replay safely from byte zero only.
+
+If that history is gone or a gap appears, reset its parser, show “Earlier terminal output is unavailable,” and attach at the current tail without replaying a ring that starts mid-sequence; the Player may redraw manually. Do not send a shell command to reconstruct output. Disconnect slow subscribers on queue overflow; continue draining the PTY into the bounded ring.
+
+Bound client rendering queues with the same overflow behavior; output floods cannot accumulate unbounded browser memory. Disable automatic terminal hyperlinks, clipboard access and unsupported terminal escape extensions.
 
 Use a small synchronous Python module named `kss_client` backed by pinned `websockets`. Pin compatible helper/packet versions into the Player image. Document imports, methods, formats and the exact terminal command beside each starter; assume basic Python knowledge.
 
@@ -232,7 +271,7 @@ Use the existing browser/API boundary where possible. Add targeted tests around 
 - Test inactivity rules with a controlled clock at the lifecycle boundary and a real execution environment for cleanup; no 30-minute wall-clock sleep is needed to cover timing edges. Test queued packets and tab/file mutations around revocation explicitly.
 - Test receiver readiness and recording checks against actual Sim/Link deliveries, not a fixture's ready flag. Infrastructure test doubles may help isolate failures, but they cannot satisfy the final real-Sim suite.
 
-Existing test prior art is limited to a FastAPI health test and a React title-render test. The retained prototype provides useful experiment scripts and browser observations, not a production regression suite. Build production tests around these public contracts and failure outcomes. Do not require the prototype's internal gateway or exact Docker command structure.
+The repository has health/UI tests plus real runtime, bridge, and deployment checks. These do not yet cover the complete learner journey. The retained prototype provides useful experiment scripts and browser observations, not a production regression suite. Build production tests around these public contracts and failure outcomes. Do not require the prototype's internal gateway or exact Docker command structure.
 
 ## Out of Scope
 
@@ -256,4 +295,4 @@ The prototype is infrastructure evidence. Production must satisfy [tab control](
 
 The prototype's warm local transition measurements are observations, not estimates or guarantees. Cold deployment and active-workload sizing remain implementation validation. Provide teammates access to the retained evidence before relying on its local references in published tickets.
 
-The acceptance requirements and architecture are agreed. The sections above define the agreed endpoint, controller, storage and terminal defaults. Limit tuning still requires measurements. Team ownership and build order are in the project plan. Local prototype paths are provenance only; no teammate task depends on accessing them. No product implementation or published Jira issue is implied by this document.
+The acceptance requirements and architecture are agreed. The sections above define the agreed endpoint, controller, storage and terminal defaults. Limit tuning still requires measurements. Team ownership and build order are in the project plan. Local prototype paths are provenance only; no teammate task depends on accessing them. The ticket map above names the implementation slices; Jira records their current status.

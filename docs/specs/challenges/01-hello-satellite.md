@@ -1,5 +1,11 @@
 # Hello, Satellite!
 
+## Read this for the first activity
+
+KSAT-17 connects a supplied PING script to the real simulation and saved completion. Start with `player/python/kss_client.py`, the Sim/Link from KSAT-10, the terminal from KSAT-13, and the session/completion services from KSAT-12 and KSAT-8. The complete activity does not exist yet.
+
+Read the learner walkthrough first, then [exact goal](#setup-defenses-and-exact-goal) and [acceptance examples](#acceptance-examples). Sending, receiving a reply, verifying the task, and saving completion are four separate events. The UI must tell the learner which actually happened.
+
 Status: confirmed as the first Basic operations Challenge in the MVP. The PING/reply foundation and task-based completion are agreed. The main learning route is running a supplied command in the integrated terminal and inspecting its real reply; no Python writing or editing is required.
 Availability and prerequisites: [Challenge progression](../project-plan.md#challenge-progression).
 

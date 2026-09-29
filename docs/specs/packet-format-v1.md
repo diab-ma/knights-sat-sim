@@ -1,5 +1,13 @@
 # Packet format v1
 
+## Read this for packet work
+
+KSAT-10 builds the encoder/decoder under `server/sim/`; KSAT-17 exposes the public helper in `player/python/kss_client.py`. The simulation folder is currently a placeholder. Other contributors usually only need the [plain-language contract](#plain-language-contract).
+
+Use the tables as the exact byte agreement between sender and receiver. **Hexadecimal** is base-16 notation (`0x10` is decimal 16); **offset** counts bytes from the start of the named structure, beginning at zero. **Big-endian** puts the most significant byte first. **CRC** is a checksum that detects changes, not proof of who sent a packet.
+
+Implementation order: read [envelope and limits](#envelope-and-limits), implement one PING using the [worked example](#worked-hello-satellite-exchange), then add the other bodies and failure cases. Preserve the exact constants and bytes below. The [glossary](../glossary.md) explains the project names.
+
 This specification defines the accepted packet format to build. It does not describe an existing implementation.
 
 ## Plain-language contract
@@ -105,7 +113,9 @@ Append a two-byte, big-endian CRC-16/CCITT-FALSE over every byte of the header a
 
 The format-validation Defense may reject header constants, declared packet length, and CRC. With it off, those checks do not stop an otherwise interpretable command. The last two bytes still occupy the CRC slot; the receiver uses the actual complete Link message boundary rather than trusting the declared header length. The supplied Hello tool generates a valid checksum. A manually changed, interpretable packet can execute with a bad checksum while this Defense is off, but cannot satisfy Hello’s conformance goal.
 
-Minimum parsing always applies: enforce the 256-byte bound, require a complete six-byte header, body prefix, bounded argument/authorization sections and two-byte CRC slot, and reject ambiguous/truncated layouts without execution. The two length-delimited body sections must consume exactly the actual body bytes before the CRC; trailing unexplained bytes are ambiguous. Minimum command size is 12 bytes. No unchecked allocation or reading outside the supplied bytes. A fully bounded body with an unknown command or invalid argument value gets the corresponding reply; an unreadable body produces only a local history explanation. Disabling a Defense never makes missing instructions executable.
+Minimum parsing always applies: enforce the 256-byte bound, require a complete six-byte header, body prefix, bounded argument/authorization sections and two-byte CRC slot, and reject ambiguous/truncated layouts without execution. The two length-delimited body sections must consume exactly the actual body bytes before the CRC; trailing unexplained bytes are ambiguous. Minimum command size is 12 bytes.
+
+No unchecked allocation or reading outside the supplied bytes. A fully bounded body with an unknown command or invalid argument value gets the corresponding reply; an unreadable body produces only a local history explanation. Disabling a Defense never makes missing instructions executable.
 
 The exact optional-Defense validation order and rejection matrix remain later design. The MVP can reserve all status codes while implementing no optional Defenses.
 

@@ -1,13 +1,18 @@
-## Which Jira issue does this build?
+## Jira ticket
 
-<!-- Required. Paste the actual assigned Jira issue key and link. -->
+<!-- Link the KSAT ticket. Put its key at the start of the PR title. -->
 
+## What changed
 
-## What changed?
+<!-- Explain the problem and resulting behavior. Mention any shared contract change. -->
 
-<!-- One or two sentences. Link the spec section if this implements behaviour. -->
+## How to check it
 
+<!-- Give short setup → action → expected result steps. -->
+<!-- List tests/manual checks actually run and their results. Note anything still unverified. -->
+<!-- For UI behavior, include useful screenshots and the Chrome version. -->
 
-## How did you check it?
+## Delivery
 
-<!-- Tests added or run, and anything a reviewer should try locally. -->
+<!-- After merge, link the successful Update website run for the commit (or a deployed descendant containing it). -->
+<!-- For infrastructure/docs, state the boundary verified; do not claim unfinished features work. -->

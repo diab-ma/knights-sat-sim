@@ -1,5 +1,24 @@
 # Knight Sat Sim: project plan
 
+This is the short product and team overview. First [run the project](../../README.md#run-locally); then follow [Contributing](../../CONTRIBUTING.md) for the ticket-to-deployment steps. The [documentation map](../README.md) helps you choose the detailed spec for your work.
+
+## How the parts fit
+
+```mermaid
+flowchart LR
+    Browser[Browser: React UI] --> API[Python: FastAPI]
+    API --> Sim[Sim Service + Software Link]
+    API --> DB[(SQLite: shared completion)]
+    API --> Controller[Trusted runtime controller]
+    Controller --> Player[Isolated Player shell + files]
+    Player --> Bridge[Restricted script bridge]
+    Bridge --> Sim
+```
+
+The browser shows controls and results. FastAPI checks who may act and manages a Challenge run (an **Attempt**). The Sim owns satellite behavior. SQLite saves shared completion. The controller runs Player programs in an isolated container; those programs reach only permitted simulation endpoints through the bridge.
+
+This diagram shows the target connections. Today the default app is a placeholder; the runtime controller and automatic deployment are implemented separately. Jira records what remains.
+
 ## Goal
 
 Build a Platform where people can practice satellite cybersecurity and learn to operate a ground station, including our station at UCF’s Physical Sciences Building (PSB).
@@ -9,6 +28,8 @@ Players will learn how the station works, practice operating it in software, and
 The product has three tracks: **Basic operations**, **Offensive**, and **Defensive**. The MVP is three Basic operations Challenges, starting with **Hello, Satellite!** Offensive and Defensive Challenges, including redesigned Replay, come later. Basic operations teaches ground-station fundamentals and builds toward the PSB equipment and workflow.
 
 ## Learner background
+
+This section describes the person using the training product. Contributors can be new to web development; repository setup and ticket instructions explain the project workflow without requiring AI.
 
 Assume some basic Python familiarity. This is a ground-station operations and satellite-security Platform, not a Python course. Give concise instructions for the supplied tools, file formats and project-specific interfaces; do not add lessons on general Python syntax. Station/RF knowledge is still taught from the basics. Running or editing Python is appropriate where it serves an operational task, without forcing code into every interaction.
 
@@ -24,15 +45,23 @@ The MVP contains exactly three Basic operations Challenges:
 
 These three learning goals are agreed. Ready for the Pass and Catch and Log share one practice pass, with either repeatable from a prepared starting point. The simulated pass starts on demand after preparation, rather than requiring a real-time wait. The [operations curriculum](ground-station-training.md#mvp-operations-curriculum) owns the interactions and success criteria. Offensive and Defensive activities are outside this MVP.
 
-Previously agreed delivery constraints remain: browser-based practice, current stable desktop Google Chrome, one active Player, local teammate development and a shared team-only hosted URL. Use Cloudflare Access email codes for approved teammates; individual Platform accounts are later work and progress remains shared. Diab maintains hosting privately; contributors use the approved development URL. The [deployment spec](backend-and-simulation.md#ownership-and-deployment) owns that foundation.
+Previously agreed delivery constraints remain: browser-based practice, current stable desktop Google Chrome, one active Player, local teammate development and a shared team-only hosted URL. Use Cloudflare Access email codes for approved teammates; individual Platform accounts are later work and progress remains shared. Diab maintains the hosting environment privately; contributors need only the approved development URL. The [deployment spec](backend-and-simulation.md#ownership-and-deployment) owns that foundation.
 
-Hello uses the Software Link, not a real spacecraft. Ready for the Pass and Catch and Log use a fictional pass brief and supplied synthetic telemetry source; the Player creates a packet recording. The [pass defaults](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) define the fixture, files and checks. Decoding packet fields does not teach RF demodulation. No live radio or station-hardware integration has been added to the MVP. The integrated terminal, code editor and shared files remain in the MVP. Hello uses the terminal; Ready for the Pass uses graphical station controls with the terminal available alongside them. Catch and Log uses the editor and terminal for a short Python script and a saved log template. Scripting runs inside the website; external Player scripts remain deferred.
+Hello uses the Software Link, not a real spacecraft. Ready for the Pass and Catch and Log use a fictional pass brief and supplied synthetic telemetry source; the Player creates a packet recording. The [pass defaults](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) define the fixture, files and checks.
+
+Decoding packet fields does not teach RF demodulation. No live radio or station-hardware integration has been added to the MVP. The integrated terminal, code editor and shared files remain in the MVP.
+
+Hello uses the terminal; Ready for the Pass uses graphical station controls with the terminal available alongside them. Catch and Log uses the editor and terminal for a short Python script and a saved log template. Scripting runs inside the website; external Player scripts remain deferred.
 
 ## Challenge progression
 
 Organize activities into the three tracks rather than one security ladder. Basic operations is the only playable MVP track. Offensive and Defensive tracks have no required MVP Challenges or prerequisite completion.
 
-Each Challenge has a Briefing, a practical learning goal and a Debrief. Operations completion is task-based: the Platform checks the required actions/results, shows what the Player accomplished and saves completion. No copying or submitting Flags in the MVP. Unlock Hello → Ready for the Pass → Catch and Log using shared demo progress. Completed Challenges stay available to repeat; a repeat of Catch and Log starts with a prepared station setup. The operations spec defines handoff and repeat defaults. Availability and completion are enforced by the server.
+Each Challenge has a Briefing, a practical learning goal and a Debrief. Operations completion is task-based: the Platform checks the required actions/results, shows what the Player accomplished and saves completion. No copying or submitting Flags in the MVP.
+
+Unlock Hello → Ready for the Pass → Catch and Log using shared demo progress. Completed Challenges stay available to repeat; a repeat of Catch and Log starts with a prepared station setup. The operations spec defines handoff and repeat defaults.
+
+Availability and completion are enforced by the server.
 
 KnightSat remains a fictional student CubeSat, separate from any real KSC spacecraft and the PSB station. Explain technical terms in plain language. There are no points, leaderboards or badges in this course year. Completing simulated training records practice; it does not certify a Player to operate real equipment alone.
 
@@ -53,17 +82,17 @@ The [ground-station training plan](ground-station-training.md) lists the lessons
 
 ## Who owns what
 
-We have two frontend roles and two backend roles. One frontend teammate will also help with the database. Diab is the project manager, handles satellite/RF work, and helps with frontend, backend, and database work as needed.
+Each ticket has one accountable owner. These starting responsibilities keep people from building the same thing twice; coordinate before changing a shared interface or another owner's files.
 
 Sydney Lalah and Lily MacInnis handle frontend work. Sydney also helps with the database. Kamilla Mamatova and Denzel Galang handle backend work. The table gives each person a starting focus; we can move tasks as needed.
 
 | Person | Main work | What they should have working |
 | --- | --- | --- |
-| Diab | Manage the project, build the simulation, handle satellite/RF work, write and check PSB training material, and help wherever needed | Working simulation, accurate lessons for the PSB station, and the pieces working together |
-| Sydney | Challenge and station lesson pages, instructions, station setup controls, history, status, and progress. Help Kamilla with database work | Players can follow the lessons and Challenges and see their progress |
-| Lily | Code editor, terminal, file controls, and the station practice screens | Players can run Python, save recordings/logs, and work through station practice |
-| Kamilla | Attempts, browser API, access checks, task verification, database, and shared progress | Challenges work and lesson progress is saved; software practice and real-station sign-off are kept separate |
-| Denzel | Running Player code, terminal connections, file storage, cleanup, and station practice data | Python and files work correctly; practice lessons can load their recorded or simulated data |
+| Diab | Infrastructure, host/access, CI/deployment, runtime controller/storage, reusable UI shell, Sim/RF, and PSB content | Other contributors have a working environment and reusable foundation. |
+| Sydney | Challenge catalogue/pages, shared API client/generated types/local proxy, setup controls, history/status/progress | Learners can navigate and see clear instructions and results. Coordinate API schemas with Kamilla and CI edits with Diab. |
+| Lily | Browser terminal, editor, file browser, notes, and Catch learner screens | Learners can edit, run, and save work through the shared application APIs. |
+| Kamilla | Browser session ownership, API schemas, progress database, task checks, and setup/Catch context | The server allows the right actions and saves verified completion. |
+| Denzel | Application terminal gateway, file API, and Workspace lifecycle/Stop/recovery | Connect the UI to Diab's existing controller without duplicating container infrastructure. |
 
 Sydney and Kamilla work together on Challenge pages and saved progress. Lily and Denzel work together on the editor and terminal. The backend teammates coordinate with Diab to connect everything to the simulation. Kamilla leads database work, with help from Sydney.
 
@@ -71,7 +100,7 @@ Everyone tests and documents their own work. We track tasks in the Knight Sat Si
 
 ## How we’ll build it
 
-The repository is a scaffold, not the implemented product. The implementation defaults are agreed; use these delivery stages for Jira tasks. Track actual implementation prerequisites with Jira blocking links; the Player's unlock order does not prevent development with isolated persisted-completion fixtures.
+The full learner experience is not implemented yet. The scaffold, local runtime infrastructure, and automatic development deployment provide starting points. The implementation defaults are agreed; use these delivery stages for Jira tasks. Track actual implementation prerequisites with Jira blocking links; the Player's unlock order does not prevent development with isolated persisted-completion fixtures.
 
 1. **Shared foundation:** packet encoder/decoder and Software Link; FastAPI models, SQLite migrations/completion, ownership and event snapshots; React shell/shared controls/generated types. Use the contracts below without choosing new frameworks.
 2. **Workspace and Hello:** isolated runtime, terminal/editor/files and prepared PING tool; complete the real browser → helper → Sim/Link → saved completion journey. Prove cleanup, access isolation and stale-save handling at this boundary.
@@ -79,9 +108,13 @@ The repository is a scaffold, not the implemented product. The implementation de
 4. **Catch and Log:** receive stream, Python starter/decoder, pass start, saved recording/log and evidence checks; prove repeat, interruption and persistence behavior.
 5. **Shared hosted demo:** automatically deploy successful main builds to the Access-gated internal development URL alongside feature work; verify all three activities and have a newcomer complete them. Development updates may interrupt sessions; production session-safe deployment is later work.
 
-The official repository is now [`senior-design-organization/knights-sat-sim`](https://github.com/senior-design-organization/knights-sat-sim), imported with all Git branches and history from the personal repository. Historical pull requests and CI evidence remain at their original URLs. The agreed baseline was originally published to `kamillamamatova/knight-sat-sim`, at [c7e742a](https://github.com/kamillamamatova/knight-sat-sim/commit/c7e742a0b663a97694f5691bf1a3773fdca3ba07). KSAT-5 also requires a teammate's fresh-clone/startup verification; publication alone does not establish that result.
+The official repository is now [`senior-design-organization/knights-sat-sim`](https://github.com/senior-design-organization/knights-sat-sim), imported with all Git branches and history from the personal repository. Historical pull requests and CI evidence remain at their original URLs. The agreed baseline was originally published to `kamillamamatova/knight-sat-sim`, at [c7e742a](https://github.com/kamillamamatova/knight-sat-sim/commit/c7e742a0b663a97694f5691bf1a3773fdca3ba07). KSAT-5's fresh-clone/startup verification is complete. KSAT-35 separately verifies a teammate's functional ticket through local work, PR, merge, and live deployment.
 
-Use one shared backlog and a weekly plan-and-demo routine. Keep the four epics for foundation, Workspace, Challenges and hosting; use area labels to find UI, server, simulation, hosting and documentation work. Build tickets have a practical starting point, one owner, true prerequisites, an explicit handoff and observable acceptance checks. Split independently deliverable behaviors while keeping their required failure handling and tests together. The [contribution rules](../../CONTRIBUTING.md#planning-and-board) own the board workflow, ticket format and review procedure. Dates and task status belong in Jira. PSB procedure research can proceed separately; unverified real-station instructions do not block the simulated MVP.
+Use one shared backlog and a weekly plan-and-demo routine. Keep the four epics for foundation, Workspace, Challenges and hosting; use area labels to find UI, server, simulation, hosting and documentation work. Build tickets have a practical starting point, one owner, true prerequisites, an explicit handoff and observable acceptance checks.
+
+Split independently deliverable behaviors while keeping their required failure handling and tests together. The [contribution rules](../../CONTRIBUTING.md#planning-and-board) own the board workflow, ticket format and review procedure. Dates and task status belong in Jira.
+
+PSB procedure research can proceed separately; unverified real-station instructions do not block the simulated MVP.
 
 ## Completion checks
 
@@ -124,6 +157,6 @@ The [glossary](../glossary.md) defines shared terms, and [Contributing](../../CO
 
 ## Implementation handoff
 
-The requirements and implementation defaults in the linked specs are agreed. Record changes in the owning spec; do not add ADRs or duplicate explanations. Package versions belong in lockfiles, running/setup instructions in README, and task status/dates in Jira. Use this plan as the reading map and the individual specs for contracts and acceptance behavior.
+The requirements and implementation defaults in the linked specs are agreed. Record changes in the owning spec; do not add ADRs or duplicate explanations. Package versions belong in lockfiles, running/setup instructions in README, and task status/dates in Jira. Use this plan and the [documentation map](../README.md) and the individual specs for contracts and acceptance behavior.
 
-External setup still needs teammate verification of the published baseline, private host setup, the domain and approved-email list. Shared setup can proceed alongside implementation. Runtime sizing and hosted access must be proven before the shared demo. Checked PSB source material and [later station lesson design](ground-station-training.md#work-still-to-specify) remain separate follow-on work.
+The shared baseline, development site, and automatic delivery are established. KSAT-7 owns approved teammate identities/domain handoff; KSAT-24 owns remaining access verification, KSAT-35 the live feature rehearsal, and KSAT-41 main-branch enforcement. These are separate from implementing the learning activities. Runtime sizing and hosted access must be proven before the shared demo. Checked PSB source material and [later station lesson design](ground-station-training.md#work-still-to-specify) remain separate follow-on work.
