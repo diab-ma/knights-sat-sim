@@ -19,7 +19,19 @@ jobs:
           python-version: "3.12"
       - run: uv sync --extra dev
       - run: uv run ruff check .
+      - run: uv run mypy --ignore-missing-imports api
       - run: uv run pytest
+
+  runtime:
+    name: Real Player runtime isolation and cleanup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t knightsat-player:ksat11 player
+      - run: docker compose -p ksat11-test -f compose.runtime-test.yml build
+      - run: docker compose -p ksat11-test -f compose.runtime-test.yml run --rm runtime-tests
+      - if: always()
+        run: docker compose -p ksat11-test -f compose.runtime-test.yml down -v
 
   ui:
     name: TypeScript lint and tests
@@ -77,7 +89,7 @@ jobs:
   publish:
     name: Publish revision images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [server, ui, hosting, access-validator]
+    needs: [server, ui, hosting, access-validator, runtime]
     concurrency:
       group: publish-${{ github.sha }}
       cancel-in-progress: false

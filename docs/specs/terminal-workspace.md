@@ -137,6 +137,50 @@ File versions are opaque SHA-256 digests of actual bytes read from disk, never a
 
 Resolve relative paths by walking directory descriptors beneath the selected volume with no symlink following. Reject absolute paths, `..`, NUL, symlinks, non-regular-file reads and special devices/FIFOs; do not rely on a string prefix check or a preflight `resolve()` followed by an unchecked open. Anchor creates/replaces to the checked parent descriptor, recheck context before committing, and close all descriptors. A short shared apply gate serializes the final grant check and replace with control revocation; awaiting a worker must not let an already-revoked save commit later. Rename/delete/new directories are terminal operations for MVP; the editor includes Save as without a separate file-management framework. Refresh the listing on panel focus and after saves; re-read an open file on editor focus to detect shell edits without replacing a dirty draft.
 
+### Controller integration handoff
+
+`api.runtime.RuntimeController` is an in-process infrastructure boundary. Construct
+one controller per deployment with the Docker client, `RuntimeStorage`, the prepared
+Player image and `RuntimeLimits`. The trusted Linux server must already mount the
+three named tmpfs volumes at `/runtime/authored`, `/runtime/managed` and
+`/runtime/bridge`; their deployment labels and actual quotas are checked. Configure
+volume names through `RUNTIME_AUTHORED_VOLUME`, `RUNTIME_MANAGED_VOLUME` and
+`RUNTIME_BRIDGE_VOLUME`, and the label value through `RUNTIME_DEPLOYMENT`.
+Empty volumes are deployment infrastructure; Stop clears their contents while the
+server keeps them mounted. Packaging/teardown owns removal of those empty volumes.
+
+Under KSAT-12's shared lifecycle/admission lock, call
+`await create(workspace_id=..., attempt_id=..., challenge_id=..., starters=...,
+resources=...)`. File maps contain plain filenames and bytes supplied by the
+Challenge implementation. The return value identifies the runtime and its recorded
+Docker container name. `terminal` is the single existing nonblocking PTY socket;
+`terminal_exec_id` supports Docker resize/exit inspection. KSAT-13 owns draining,
+buffering and authenticated browser attachment; attaching never creates a shell.
+
+`api.script_bridge.ScriptBridge` runs its script-only ASGI listener on the same
+server event loop. Bind the active Attempt ID, secret, protocol and actual Sim
+WebSocket handler, then start it on `/runtime/bridge/raw.sock`. Ready has no binding.
+Opening authentication and revocation checks also apply to direct Unix-socket
+clients. The handler still owns protocol feedback, subscriptions and Sim mutation
+under the Attempt operation lock; it must recheck revocation at application time.
+The infrastructure fixtures are not Sim handlers.
+
+Revoke browser/script grants and await `bridge.stop()` before
+`await controller.destroy(clear_workspace=False)` for replacement, or `True` for
+Stop/expiry/reset. Recreate the listener/resources explicitly for the next runtime;
+runtime-only reopening reuses the current Attempt context. Creation never releases
+ownership. `RuntimeFailure.code` is `RUNTIME_UNAVAILABLE` or `CLEANUP_FAILED`;
+`current` and `failed` retain the cleanup obligation. A cancelled Docker worker
+continues to completion; cleanup refuses to overtake it and must be retried
+explicitly. Release the application slot only after successful cleanup.
+
+Labels `org.knightsat.deployment`, `org.knightsat.runtime` and
+`org.knightsat.workspace` identify execution; storage volumes carry the deployment
+label. KSAT-37 must reconcile recorded/labelled abandoned resources and clear all
+personal storage before readiness/admission, even if no execution container remains.
+The controller refuses new execution while another labelled runtime remains; it
+does not implement a second admission lock, startup readiness or maintenance route.
+
 ## Implementation defaults: terminal and helper contracts
 
 Browser terminal socket: `/api/attempts/{id}/terminal`, authenticated by cookie and Origin. First client message is `{type: "attach", runtime_id, tab_id, generation, after_offset: integer|null}`. Observers may attach/read; every input, resize and interrupt verifies the current grant/runtime again at application time. Payloads are JSON; terminal byte strings use base64, not Unicode conversion of arbitrary output.

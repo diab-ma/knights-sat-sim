@@ -1,0 +1,43 @@
+# Local, disposable real-Docker acceptance harness. Never used by live hosting.
+services:
+  runtime-tests:
+    build:
+      context: ./server
+      dockerfile: tests/runtime/Dockerfile
+    environment:
+      RUNTIME_DEPLOYMENT: ksat11-test
+      RUNTIME_AUTHORED_VOLUME: ksat11-test-authored
+      RUNTIME_MANAGED_VOLUME: ksat11-test-managed
+      RUNTIME_BRIDGE_VOLUME: ksat11-test-bridge
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - authored:/runtime/authored
+      - managed:/runtime/managed
+      - bridge:/runtime/bridge
+      - ./server/api:/app/api:ro
+      - ./server/tests:/app/tests:ro
+volumes:
+  authored:
+    name: ksat11-test-authored
+    labels:
+      org.knightsat.deployment: ksat11-test
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=64m,uid=1000,gid=1000,nosuid,nodev
+  managed:
+    name: ksat11-test-managed
+    labels:
+      org.knightsat.deployment: ksat11-test
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1m,uid=1000,gid=1000,nosuid,nodev,noexec
+  bridge:
+    name: ksat11-test-bridge
+    labels:
+      org.knightsat.deployment: ksat11-test
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1m,uid=1000,gid=1000,nosuid,nodev,noexec
