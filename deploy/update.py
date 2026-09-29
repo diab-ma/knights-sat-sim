@@ -10,7 +10,7 @@ import sys
 import tempfile
 from urllib.request import urlopen
 
-from release import REPO, require, select
+from release import REPO, github, require, revision, select
 
 ROOT = Path('/opt/knightsat')
 STATE = ROOT / 'deploy/state'
@@ -37,11 +37,16 @@ def deploy(request):
         release = select(request['revision'], request['token'], bootstrap)
         sha = release['revision']
         current = inspect('knightsat-server-1', 'knightsat-web-1')
-        require(len(current) == 2, 'Expected the existing placeholder stack')
+        require(len(current) == 2, 'Expected the existing development stack')
         # Installation records the current images; detect out-of-band replacement.
         allowed = json.loads((ROOT / 'current.json').read_text())
         require({c['Name']: c['Image'] for c in current} == allowed['images'],
-                'Running images differ from the last qualified deployment')
+                'Running images differ from the last recorded deployment')
+        if allowed['revision'] != 'historical-placeholder':
+            previous = revision(allowed['revision'])
+            comparison = github(f'compare/{previous}...{sha}', request['token'])
+            require(comparison['status'] in ('ahead', 'identical'),
+                    'A newer revision is already deployed; refusing an older queued update')
         volume = next(m['Name'] for c in current if c['Name'] == '/knightsat-server-1'
                       for m in c['Mounts'] if m['Destination'] == '/data')
         require(volume == 'knightsat_progress', 'Unexpected progress volume')

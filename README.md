@@ -50,7 +50,7 @@ Pull requests run the same checks in GitHub Actions.
 
 ## How we work
 
-Jira holds build tickets. Open a branch named with the Jira key, open a pull request whose title starts with that key, wait for CI, and get one teammate review before merge. Details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Jira holds build tickets. Open a branch named with the Jira key, open a pull request whose title starts with that key, wait for CI, and follow the review rules (including Diab's authorization for his own merges). Details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 
 ## Local Player runtime checks (KSAT-11)

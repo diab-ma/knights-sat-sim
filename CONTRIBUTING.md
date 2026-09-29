@@ -1,6 +1,6 @@
 # Contributing
 
-Work is tracked in the **Knight Sat Sim (KSAT)** Jira project. Use the [shared board](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1) and [backlog](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1/backlog). Pick a ready ticket, branch, open a pull request, pass CI, request review, then merge.
+Work is tracked in the **Knight Sat Sim (KSAT)** Jira project. Use the [shared board](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1) and [backlog](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1/backlog). Pick a ready ticket, branch, open a pull request, pass CI, follow the review rules below, then merge.
 
 The official repository is [senior-design-organization/knights-sat-sim](https://github.com/senior-design-organization/knights-sat-sim). Do not change repository visibility as part of implementation work.
 
@@ -18,6 +18,8 @@ Use one shared backlog with continuous flow. The four epics group the shared fou
 The workflow is **Backlog → Ready → In progress → Review → Done**. Backlog holds work not yet selected or ready. Ready means the scope and acceptance checks are clear, the owner has a supported starting point, and true prerequisites are met. Flag blocked work, state what it needs, and link the actual prerequisite. Player unlock order is not automatically implementation order; use isolated test fixtures where the specs allow them.
 
 Start with one active implementation ticket per person. Help finish reviews and unblock teammates before starting more work. One person owns the outcome and can ask others to help. Request approval from one teammate other than the author when the pull request is ready; do not assign a fixed reviewer in the ticket description.
+
+**Diab's merge authorization:** Diab may merge his own work without teammate approval after required checks pass. Keep the pull request, Jira link and acceptance evidence. Other contributors follow the teammate-review rule above.
 
 At the start of each week, select a small demonstrable goal based on available time. At the end, show working behavior, discuss blockers, and choose one process improvement. Report blockers as they occur. Fixed sprints and story-point estimates are not required for this workflow; retain course-required reporting separately.
 
@@ -54,7 +56,7 @@ A change is done when all of the following are true:
 1. The Jira issue's acceptance checks are met, and the relevant `docs/specs/` rules are followed.
 2. New behaviour has tests.
 3. CI is green on the pull request.
-4. One teammate (not the author) has reviewed and approved.
+4. One teammate (not the author) has reviewed and approved, except for Diab's own merges under his authorization above.
 5. The Jira key is in the branch name and the pull request title.
 
 Then merge to `main` and move the Jira issue.
@@ -63,7 +65,7 @@ For external setup without a code change, meet the ticket's acceptance checks, r
 
 ## Updating the shared website
 
-Merging code does not automatically update the hosted demo. The **Update website** workflow is manually triggered and currently accepts only the qualified placeholder build inputs. Player-session deployment remains blocked until atomic busy refusal and admission/maintenance integration are implemented. See the [deployment rules](docs/specs/backend-and-simulation.md#updating-the-hosted-demo). See the README operator runbook for setup and recovery.
+Merging to `main` runs CI, publishes tested images and automatically triggers **Update website** for that exact commit. The shared URL is an internal development environment: updates can interrupt teammate sessions, running programs and unsaved work. Check the **Update website** result and `/revision` to confirm delivery; a merged PR or successful dispatch alone does not prove deployment. The manual workflow remains available for retries. Production session-safe deployment is later work. See the [deployment rules](docs/specs/backend-and-simulation.md#updating-the-hosted-demo). See the README operator runbook for setup and recovery.
 
 ## Specs and language
 

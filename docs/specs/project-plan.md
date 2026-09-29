@@ -67,7 +67,7 @@ Sydney Lalah and Lily MacInnis handle frontend work. Sydney also helps with the 
 
 Sydney and Kamilla work together on Challenge pages and saved progress. Lily and Denzel work together on the editor and terminal. The backend teammates coordinate with Diab to connect everything to the simulation. Kamilla leads database work, with help from Sydney.
 
-Everyone tests and documents their own work. We track tasks in the Knight Sat Sim (KSAT) Jira project, with one accountable owner per task. Request a non-author teammate's review when a pull request is ready; do not preassign a fixed reviewer. For external setup without a PR, another teammate verifies the recorded result when ready. RF hardware work comes later.
+Everyone tests and documents their own work. We track tasks in the Knight Sat Sim (KSAT) Jira project, with one accountable owner per task. Follow the [contribution review rules](../../CONTRIBUTING.md#planning-and-board), including Diab's authorization for his own merges; do not preassign a fixed reviewer. For external setup without a PR, another teammate verifies the recorded result when ready. RF hardware work comes later.
 
 ## How we’ll build it
 
@@ -77,7 +77,7 @@ The repository is a scaffold, not the implemented product. The implementation de
 2. **Workspace and Hello:** isolated runtime, terminal/editor/files and prepared PING tool; complete the real browser → helper → Sim/Link → saved completion journey. Prove cleanup, access isolation and stale-save handling at this boundary.
 3. **Ready for the Pass:** scenario fixture, graphical setup, field feedback and completion; prove current setup validation and the handoff into Catch.
 4. **Catch and Log:** receive stream, Python starter/decoder, pass start, saved recording/log and evidence checks; prove repeat, interruption and persistence behavior.
-5. **Shared hosted demo:** implement Access-gated deployment alongside the feature work; verify all three activities at the team URL and have a newcomer complete them.
+5. **Shared hosted demo:** automatically deploy successful main builds to the Access-gated internal development URL alongside feature work; verify all three activities and have a newcomer complete them. Development updates may interrupt sessions; production session-safe deployment is later work.
 
 The official repository is now [`senior-design-organization/knights-sat-sim`](https://github.com/senior-design-organization/knights-sat-sim), imported with all Git branches and history from the personal repository. Historical pull requests and CI evidence remain at their original URLs. The agreed baseline was originally published to `kamillamamatova/knight-sat-sim`, at [c7e742a](https://github.com/kamillamamatova/knight-sat-sim/commit/c7e742a0b663a97694f5691bf1a3773fdca3ba07). KSAT-5 also requires a teammate's fresh-clone/startup verification; publication alone does not establish that result.
 
@@ -92,7 +92,7 @@ These are implementation acceptance requirements, not completed results.
 - [ ] Completion is committed before success/unlock is shown, with a Debrief and no Flag step.
 - [ ] Terminal, editor, notes, files and downloads work with the ownership, lifecycle and recovery rules below.
 - [ ] A newcomer with basic Python familiarity can complete the activities in Chrome and explain their operational purpose.
-- [ ] Approved teammates can use the hosted demo with shared progress, access isolation and safe updates.
+- [ ] Approved teammates can use the hosted demo with shared progress, access isolation and verified automatic development updates.
 - [ ] Simulation is clearly labelled; no unverified PSB procedure or later security activity is required.
 
 The primary acceptance boundary is browser interaction against the real Backend, Sim/Link, SQLite and runtime. Use the [Workspace acceptance suite](terminal-workspace.md#primary-acceptance-suite) and each activity's checks, with focused persistence/access/runtime faults. Use Playwright with Google Chrome for browser acceptance checks; pytest/Vitest cover focused behavior where useful.

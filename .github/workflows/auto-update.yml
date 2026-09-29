@@ -1,0 +1,26 @@
+name: Automatically update development website
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      # Dispatch reuses the existing main-only deployment identity and host lock.
+      - name: Deploy the tested main revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: gh workflow run update-website.yml --ref main --field revision="$REVISION"

@@ -12,10 +12,10 @@ REPO = "senior-design-organization/knights-sat-sim"
 REQUIRED = {
     "Python lint and tests", "TypeScript lint and tests",
     "Private hosting build and smoke checks", "Access JWT validator cases",
-    "Publish revision images",
+    "Real Player runtime isolation and cleanup", "Publish revision images",
 }
-INPUTS = ("server/", "ui/", "deploy/Dockerfile", "deploy/nginx.conf",
-          "compose.hosting.yml", ".dockerignore")
+# The host installs Compose independently; application images can change on every merge.
+INPUTS = ("compose.hosting.yml",)
 
 
 def require(condition, message):
@@ -34,7 +34,7 @@ def fingerprint(tree):
                      if any(item["path"].startswith(p) if p.endswith("/")
                             else item["path"] == p for p in INPUTS)
                      and item["type"] != "tree")
-    require(entries, "Missing bootstrap build inputs")
+    require(entries, "Missing hosted Compose configuration")
     return hashlib.sha256(json.dumps(entries).encode()).hexdigest()
 
 
@@ -74,7 +74,7 @@ def select(sha, token, bootstrap):
     tree = github(f"git/trees/{sha}?recursive=1", token)
     require(not tree.get("truncated"), "Incomplete source tree")
     require(fingerprint(tree["tree"]) == bootstrap,
-            "Bootstrap refuses changed application/build inputs; finish KSAT-25 admission integration")
+            "Hosted Compose configuration changed; install the reviewed host configuration first")
     runs = github(f"actions/workflows/ci.yml/runs?head_sha={sha}&event=push&per_page=100", token)
     candidates = [r for r in runs["workflow_runs"]
                   if r["head_sha"] == sha and r["head_branch"] == "main"

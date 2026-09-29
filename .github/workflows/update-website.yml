@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       revision:
-        description: Full 40-character tested main commit SHA (placeholder only)
+        description: Full 40-character tested main commit SHA (shared development website)
         required: true
         type: string
 permissions:

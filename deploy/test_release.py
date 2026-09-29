@@ -11,7 +11,7 @@ import release
 
 update = importlib.import_module('update')
 SHA = 'a' * 40
-TREE = [{'path': 'server/api/main.py', 'mode': '100644', 'sha': 'b' * 40, 'type': 'blob'}]
+TREE = [{'path': 'compose.hosting.yml', 'mode': '100644', 'sha': 'b' * 40, 'type': 'blob'}]
 FINGERPRINT = release.fingerprint(TREE)
 
 
@@ -48,18 +48,17 @@ class ReleaseTest(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     release.select(SHA, 'fixture', FINGERPRINT)
         with patch.object(release, 'github', side_effect=self.responses):
-            with self.assertRaisesRegex(RuntimeError, 'Bootstrap refuses'):
+            with self.assertRaisesRegex(RuntimeError, 'Hosted Compose configuration changed'):
                 release.select(SHA, 'fixture', 'unknown')
         for value in ('main', 'a'*7, '../main', SHA+'\n', 'A'*40):
             with self.assertRaises(RuntimeError):
                 release.revision(value)
 
-    def test_fingerprint_tracks_added_changed_and_deleted_application_inputs(self):
+    def test_application_updates_are_allowed_but_host_configuration_must_match(self):
         self.assertEqual(FINGERPRINT, release.fingerprint(TREE + [
-            {'path': 'README.md', 'mode': '100644', 'sha': 'f'*40, 'type': 'blob'}]))
-        for tree in ([{**TREE[0], 'sha': 'f'*40}],
-                     TREE + [{**TREE[0], 'path': 'server/api/sessions.py'}]):
-            self.assertNotEqual(FINGERPRINT, release.fingerprint(tree))
+            {'path': 'server/api/sessions.py', 'mode': '100644', 'sha': 'f'*40, 'type': 'blob'},
+            {'path': 'ui/src/App.tsx', 'mode': '100644', 'sha': 'e'*40, 'type': 'blob'}]))
+        self.assertNotEqual(FINGERPRINT, release.fingerprint([{**TREE[0], 'sha': 'f'*40}]))
         with self.assertRaises(RuntimeError):
             release.fingerprint([])
 
@@ -84,13 +83,33 @@ class ReleaseTest(unittest.TestCase):
                     command.assert_not_called()
                     self.assertFalse((root / 'active').exists())
 
+    def test_older_queued_update_cannot_replace_a_newer_deployment(self):
+        containers = [{'Name': '/knightsat-server-1', 'Image': 'new-server'},
+                      {'Name': '/knightsat-web-1', 'Image': 'new-web'}]
+        record = {'revision': 'f'*40, 'images': {c['Name']: c['Image'] for c in containers}}
+        for status in ('behind', 'diverged'):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / 'bootstrap.sha256').write_text(FINGERPRINT)
+                (root / 'current.json').write_text(json.dumps(record))
+                with patch.object(update, 'ROOT', root), patch.object(update, 'STATE', root), \
+                        patch.object(update, 'select', return_value=self.responses[-1]), \
+                        patch.object(update, 'inspect', return_value=containers), \
+                        patch.object(update, 'github', return_value={'status': status}), \
+                        patch.object(update, 'run') as command:
+                    with self.assertRaisesRegex(RuntimeError, 'newer revision'):
+                        update.deploy({'revision': SHA, 'token': 'fixture'})
+                    command.assert_not_called()
+                self.assertFalse((root / 'active').exists())
+                self.assertEqual(json.loads((root / 'current.json').read_text()), record)
+
     def test_failed_replacement_stays_closed_and_preserves_record(self):
         containers = [
             {'Name': '/knightsat-server-1', 'Image': 'old-server',
              'Mounts': [{'Name': 'knightsat_progress', 'Destination': '/data'}]},
             {'Name': '/knightsat-web-1', 'Image': 'old-web', 'Mounts': []},
         ]
-        record = {'images': {c['Name']: c['Image'] for c in containers}}
+        record = {'revision': 'e'*40, 'images': {c['Name']: c['Image'] for c in containers}}
         def command(*args, **kwargs):
             if 'up' in args:
                 raise RuntimeError('fixture replacement failed')
@@ -104,6 +123,7 @@ class ReleaseTest(unittest.TestCase):
             with patch.object(update, 'ROOT', root), patch.object(update, 'STATE', root), \
                     patch.object(update, 'select', return_value=self.responses[-1]), \
                     patch.object(update, 'inspect', side_effect=[containers, [image], [image]]), \
+                    patch.object(update, 'github', return_value={'status': 'ahead'}), \
                     patch.object(update, 'run', side_effect=command):
                 with self.assertRaisesRegex(RuntimeError, 'replacement failed'):
                     update.deploy({'revision': SHA, 'token': 'fixture'})
