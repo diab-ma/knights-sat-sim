@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-REPO = "kamillamamatova/knight-sat-sim"
+REPO = "senior-design-organization/knights-sat-sim"
 REQUIRED = {
     "Python lint and tests", "TypeScript lint and tests",
     "Private hosting build and smoke checks", "Access JWT validator cases",

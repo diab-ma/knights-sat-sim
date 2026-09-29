@@ -2,7 +2,7 @@
 
 Work is tracked in the **Knight Sat Sim (KSAT)** Jira project. Use the [shared board](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1) and [backlog](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1/backlog). Pick a ready ticket, branch, open a pull request, pass CI, request review, then merge.
 
-The official repository is [kamillamamatova/knight-sat-sim](https://github.com/kamillamamatova/knight-sat-sim). Do not change repository visibility as part of implementation work.
+The official repository is [senior-design-organization/knights-sat-sim](https://github.com/senior-design-organization/knights-sat-sim). Do not change repository visibility as part of implementation work.
 
 ## Branch and pull request
 
