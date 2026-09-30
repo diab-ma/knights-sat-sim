@@ -29,7 +29,7 @@ A placeholder page is the expected result of setup. Specifications describe the 
 
 Install Git and Docker Desktop for your operating system. Start Docker Desktop and wait until its engine is running. On Linux, Docker Engine with the Compose plugin also works.
 
-This GitHub repository is private. Accept your repository invitation and confirm you can open it while signed in before cloning. If GitHub shows “not found,” ask Diab to check access; a private repository can show that message when you are signed out.
+This GitHub repository is public. You can read and clone it without a repository invitation or GitHub sign-in. To push a branch to the organization repository, ask Diab for write access. You also need access to the team’s Jira board to work on a ticket.
 
 **New to Git authentication?** Use GitHub Desktop: sign in, choose **File → Clone repository → URL**, enter the repository URL below, and choose a local folder. Open a terminal in that cloned folder and run `docker compose up --build`. This avoids creating or pasting access tokens.
 
