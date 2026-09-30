@@ -26,10 +26,12 @@ cd knights-sat-sim
 docker compose up --build
 ```
 
-- UI: [http://localhost:5173](http://localhost:5173) — “Satellite Security Challenge Platform” is the expected placeholder.
+- UI: [http://localhost:5173](http://localhost:5173) — opens the workstation with Briefing previews and empty Workspace panels.
 - Server: [http://localhost:8000/health](http://localhost:8000/health) — returns `{"status":"ok"}`.
 
 Docker installs the application dependencies; local setup needs no `.env` file or private server keys. Stop with **Ctrl+C**, then run `docker compose down` (without `-v`, which deletes local data). For native setup and test commands, see [Development](docs/development.md).
+
+Playable Challenges, terminal execution, saved files and progress are not connected yet. UI contributors can use `/dev/components` in development; see the [workstation handoff](docs/specs/frontend.md#workstation-implementation-handoff-ksat-36).
 
 ## Work on a ticket
 

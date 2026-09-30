@@ -2,7 +2,7 @@
 
 ## Read this for browser work
 
-This is the agreement for the UI we are building. Start in `ui/src/App.tsx`; it is currently a placeholder. Do not assume the libraries in the table below are installed yet.
+This is the agreement for the UI we are building. Start in `ui/src/App.tsx` and `ui/src/Workstation.tsx` for the reusable shell and routes. Shared controls are installed; catalogue, session and execution integration remain separate work.
 
 | Ticket | First deliverable | Shared boundary |
 | --- | --- | --- |
@@ -13,7 +13,7 @@ This is the agreement for the UI we are building. Start in `ui/src/App.tsx`; it 
 
 Read the relevant section, then its acceptance checks. **Provider** means shared React state available to child components; **reducer** means a function that calculates the next state from an action. See the [glossary](../glossary.md) for other terms.
 
-This spec owns the shared UI foundation and browser conventions for the operations MVP. Start with the [project plan](project-plan.md). The foundation, behavior and implementation defaults below are agreed requirements. The current UI remains a scaffold.
+This spec owns the shared UI foundation and browser conventions for the operations MVP. Start with the [project plan](project-plan.md). The foundation, behavior and implementation defaults below are agreed requirements. The current UI provides the KSAT-36 workstation skeleton; catalogue, session and execution integration remain separate work.
 
 ## Shared UI foundation
 
@@ -36,7 +36,7 @@ Provide a small developer component example page showing the supported controls 
 
 The supported MVP browser is current stable desktop Google Chrome. Run the required browser acceptance checks in Chrome and record the tested version with the results. Other browsers are outside the MVP support commitment; do not deliberately block them solely by browser name.
 
-Preserve the approved full-height workstation: left navigation, central work area with a terminal dock, and right supporting panels. Use the existing dark visual direction, readable labels, visible keyboard focus, and text alongside status colors. The [Workspace spec](terminal-workspace.md#application-and-responsibility-boundaries) owns workspace interaction requirements.
+Use three full-height panes, following the Slack/Codex reference: left navigation, a substantial Workspace pane in the center, and the Challenge guide on the right. Keep the guide and working tools side by side. Use the existing dark visual direction, readable labels, visible keyboard focus, and text alongside status colors. The [Workspace spec](terminal-workspace.md#application-and-responsibility-boundaries) owns workspace interaction requirements.
 
 The first demo supports desktop use, targeting widths of 1280px and above. Below the supported width, show a clear message explaining that the demo requires a wider desktop window. Phone/tablet layouts and collapsing the workstation into a mobile interface are deferred. Keep keyboard access and readable text at browser zoom; do not shrink text to force the layout to fit.
 
@@ -96,8 +96,8 @@ Generated TypeScript types provide development-time checks; they do not validate
 These defaults carry the approved visual direction into a self-contained build reference; teammates do not need the local mockup to implement the shell.
 
 - Routes: `/` redirects to `/challenges/hello-satellite`; `/challenges/:challenge_id` displays a Briefing without starting an Attempt. MVP IDs are `hello-satellite`, `ready-for-the-pass` and `catch-and-log`. Unlock them in that order using server-owned shared demo progress; completed activities remain repeatable. Offensive and Defensive tracks are labelled Coming later with no playable routes. Unknown IDs show Not found. `/dev/components` is available only in development.
-- Use a full-height CSS grid: left rail 204px, flexible center with minimum width 640px, right inspector 296px. At 1500px and wider, use 224px and 320px side columns. Regions scroll independently; the center dock starts at 276px high. Resizable splitters and saved layout preferences are deferred.
-- Left: Challenge navigation and files. Center: contextual map and Challenge tools (Hello terminal instructions or the current operations exercise), then Terminal / Editor / Notes tabs. Right: Briefing, Satellite Sim state, task-completion feedback and Debrief. Bottom: connection and command-delivery status. Display the active Challenge beside every live tool when it differs from the viewed page.
+- Use a full-height CSS grid: left rail 240px, central Workspace with minimum width 480px, and right guide with minimum width 440px. Divide remaining width between Workspace and guide in a 1.15:1 ratio. Give each pane an aligned header and independently scrolling content. The Workspace fills its pane vertically. Resizable splitters and saved layout preferences are deferred.
+- Left: Challenge navigation and files. Center: persistent Terminal / Editor / Notes tabs, active Challenge tools (including station controls), and Satellite Sim state. Right: the viewed Challenge’s Briefing, instructions, task-completion feedback, Debrief and contextual map. Bottom: connection and command-delivery status. Display the active Challenge beside every live tool when it differs from the viewed page.
 - Narrow windows and browser zoom show a nonblocking width notice above the workstation; preserve the session, drafts, keyboard access and horizontal scrolling. Never stop execution or hide the only Stop control because the viewport shrank.
 - Start with the tokens below, system sans-serif for prose and system monospace for bytes/code. Body text is 14–16px; secondary labels at least 12px. Use 4px spacing increments and 6px control corners. Verify contrast and focus in the rendered UI; the mockup's tiny labels are not requirements.
 
@@ -110,3 +110,16 @@ These defaults carry the approved visual direction into a self-contained build r
 Use shared Button, Input, Label, Tabs, Dialog, AlertDialog, Select, Tooltip and Alert controls. Native tables render packet fields/history; CodeMirror and xterm own their specialist surfaces. Stop, Reset workspace and Reset demo progress use explicit destructive-action dialogs. Prefer inline status to toasts, CSS grid to a layout package, and native form state to an additional form library. Dark appearance only for MVP.
 
 Implementation references: [shadcn/ui for Vite](https://ui.shadcn.com/docs/installation/vite) and [CodeMirror](https://codemirror.net/docs/guide/).
+
+
+## Workstation implementation handoff (KSAT-36)
+
+- `ui/src/App.tsx` owns routes and the development-only, lazy-loaded `/dev/components` reference. The production build excludes its route, link and example code. Unknown routes and Challenge IDs show Not found.
+- `ui/src/Workstation.tsx` owns the persistent shell and Workspace pane. Its small Briefing list is display-only: it supplies no unlock, Attempt or completion state. Sydney’s KSAT-9 replaces it with the server catalogue/client; browsing remains separate from starting or switching an Attempt.
+- KSAT-12 mounts the Context/useReducer Attempt provider inside `Workstation`, around both routed content and persistent panels. No synthetic session reducer or connection is supplied here. Lily’s terminal/editor work belongs in the persistent Workspace pane; keep draft-bearing panels mounted. Label future live tools from the active Attempt, never from the viewed route.
+- Shared controls live in `ui/src/components/ui/`. `ui/components.json`, `ui/vite.config.ts` and `ui/src/styles.css` centralize the Base UI registry, build integration and dark tokens. System fonts, 4px spacing units, 6px corners and the specified desktop columns are used.
+- Run `npm run dev` from `ui/` and visit `/dev/components` for labelled form controls, persistent errors, tabs, dialogs, confirmation and tooltips. Base UI tabs use arrows for focus and Enter/Space for selection. Import these controls in feature screens rather than implementing replacements.
+
+Verification on 2026-09-29: Google Chrome 154.0.8037.92 on macOS, using Playwright. Checked 1280px and 1600px layouts, 1000px width notice/horizontal scrolling, persistent Workspace pane and selected tab through route changes and Back/Forward, keyboard tabs/select, and dialog Escape/focus return. Empty panels report unavailable session, telemetry, command-delivery and progress services. Vitest covers route/Workspace persistence, unknown Challenges and example form/confirmation behavior. Production preview rejects `/dev/components`, and its bundle contains no example page. These are skeleton checks, not evidence for real session or Sim behavior.
+
+Layout revision: the three-pane Slack/Codex reference replaces the original center dock and narrow inspector. Guide browsing remains separate from the active Workspace; route changes preserve the mounted Workspace and selected tab.
