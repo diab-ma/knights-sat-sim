@@ -11,7 +11,7 @@ Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime
 | Saved completion and Challenge list | [Progress storage](#progress-storage), [storage defaults](#implementation-defaults-simulation-and-storage) | KSAT-8 |
 | Packet simulation | [State and commands](#state-and-commands), [operations](#operations-and-data), Packet format spec | KSAT-10 |
 | Start/control/Stop and event snapshots | [Browser contract](#implementation-defaults-browser-contract), [lifecycle](#lifecycle-and-recovery) | KSAT-12 |
-| Reconnect without duplicate commands | [Live updates](#live-updates-and-resynchronization) | KSAT-31 |
+| Browser provider/session controls and reconnect | [Live updates](#live-updates-and-resynchronization), Frontend shared state | KSAT-31, Sydney; server ownership/events remain KSAT-12, Kamilla |
 | Ready setup / Catch evidence | [Task completion](#task-completion), browser contract, operations curriculum | KSAT-40 / KSAT-22 |
 | Hosting and cleanup | [Hosting defaults](#implementation-defaults-hosting) | KSAT-23 / KSAT-24 / KSAT-37 |
 
@@ -84,6 +84,8 @@ Individual Platform accounts and per-account progress belong to later work. Clou
 ## Progress storage
 
 Use Python's built-in `sqlite3` through one shared progress module. Use parameterized SQL and explicit transactions; no ORM or additional database-access package is required for the first demo. API handlers call named operations to read completed Challenges, save completion, and reset demo progress rather than implementing database handling independently.
+
+KSAT-8 delivers storage/migrations, catalogue models/API and a storage reset primitive. KSAT-12 mounts the public reset route with exact confirmation and the shared idle/Start lock; no ungated reset is exposed before that integration. Sydney's KSAT-31 connects the browser confirmation and authoritative progress refresh. This separates delivery boundaries without weakening the reset checks below.
 
 - Store shared demo progress in the SQLite database configured by `SQLITE_PATH`, using the persistent volume described above. Live Attempt state and packet history remain in memory. All three MVP activities use the same Challenge completion schema; broader lesson schemas are deferred.
 - Enforce completion uniqueness in the database so repeating a verified task completion cannot create duplicate completion records. Commit completion before reporting success. A database failure must not produce a successful completion response.

@@ -8,7 +8,8 @@ This is the agreement for the UI we are building. Start in `ui/src/App.tsx` and 
 | --- | --- | --- |
 | KSAT-36 (Diab) | Reusable controls and workstation layout | Other UI tickets use these components. |
 | KSAT-9 (Sydney) | Challenge list, API client, generated types, local API proxy | Kamilla owns the API schemas; coordinate CI edits with Diab. |
-| KSAT-12 / KSAT-31 (Kamilla) | One shared session provider / reconnect handling | Panels read the same server state; do not open separate event connections. |
+| KSAT-31 (Sydney) | One shared session provider, session controls and reconnect handling | Kamilla supplies server ownership/events in KSAT-12; panels share one connection. |
+| KSAT-44 / KSAT-45 (Sydney / Lily) | Reusable station form / editor component | Component checks precede real API integration in KSAT-18 / KSAT-14. |
 | KSAT-13 / KSAT-14 / KSAT-32 (Lily) | Terminal / editor / file browser | Denzel supplies the gateway (38) and file API (39). |
 
 Read the relevant section, then its acceptance checks. **Provider** means shared React state available to child components; **reducer** means a function that calculates the next state from an action. See the [glossary](../glossary.md) for other terms.
@@ -116,7 +117,7 @@ Implementation references: [shadcn/ui for Vite](https://ui.shadcn.com/docs/insta
 
 - `ui/src/App.tsx` owns routes and the development-only, lazy-loaded `/dev/components` reference. The production build excludes its route, link and example code. Unknown routes and Challenge IDs show Not found.
 - `ui/src/Workstation.tsx` owns the persistent shell and Workspace pane. Its small Briefing list is display-only: it supplies no unlock, Attempt or completion state. Sydney’s KSAT-9 replaces it with the server catalogue/client; browsing remains separate from starting or switching an Attempt.
-- KSAT-12 mounts the Context/useReducer Attempt provider inside `Workstation`, around both routed content and persistent panels. No synthetic session reducer or connection is supplied here. Lily’s terminal/editor work belongs in the persistent Workspace pane; keep draft-bearing panels mounted. Label future live tools from the active Attempt, never from the viewed route.
+- Sydney's KSAT-31 mounts the Context/useReducer Attempt provider inside `Workstation`, around both routed content and persistent panels, consuming Kamilla's KSAT-12 server contract. No synthetic session reducer or connection is supplied here. Lily’s terminal/editor work belongs in the persistent Workspace pane; keep draft-bearing panels mounted. Label future live tools from the active Attempt, never from the viewed route.
 - Shared controls live in `ui/src/components/ui/`. `ui/components.json`, `ui/vite.config.ts` and `ui/src/styles.css` centralize the Base UI registry, build integration and dark tokens. System fonts, 4px spacing units, 6px corners and the specified desktop columns are used.
 - Run `npm run dev` from `ui/` and visit `/dev/components` for labelled form controls, persistent errors, tabs, dialogs, confirmation and tooltips. Base UI tabs use arrows for focus and Enter/Space for selection. Import these controls in feature screens rather than implementing replacements.
 

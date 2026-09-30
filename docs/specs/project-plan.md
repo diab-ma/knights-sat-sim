@@ -89,9 +89,9 @@ Sydney Lalah and Lily MacInnis handle frontend work. Sydney also helps with the 
 | Person | Main work | What they should have working |
 | --- | --- | --- |
 | Diab | Infrastructure, host/access, CI/deployment, runtime controller/storage, reusable UI shell, Sim/RF, and PSB content | Other contributors have a working environment and reusable foundation. |
-| Sydney | Challenge catalogue/pages, shared API client/generated types/local proxy, setup controls, history/status/progress | Learners can navigate and see clear instructions and results. Coordinate API schemas with Kamilla and CI edits with Diab. |
+| Sydney | Challenge catalogue/pages, shared API client/generated types/local proxy, browser session provider/reconnect, setup controls, history/status/progress | Learners can navigate and see clear instructions and results. Coordinate API schemas with Kamilla and CI edits with Diab. |
 | Lily | Browser terminal, editor, file browser, notes, and Catch learner screens | Learners can edit, run, and save work through the shared application APIs. |
-| Kamilla | Browser session ownership, API schemas, progress database, task checks, and setup/Catch context | The server allows the right actions and saves verified completion. |
+| Kamilla | Server enforcement of browser session ownership, API schemas, progress database, task checks, and setup/Catch context | The server allows the right actions and saves verified completion. Sydney consumes the session contract in the browser. |
 | Denzel | Application terminal gateway, file API, and Workspace lifecycle/Stop/recovery | Connect the UI to Diab's existing controller without duplicating container infrastructure. |
 
 Sydney and Kamilla work together on Challenge pages and saved progress. Lily and Denzel work together on the editor and terminal. The backend teammates coordinate with Diab to connect everything to the simulation. Kamilla leads database work, with help from Sydney.
@@ -113,6 +113,10 @@ The official repository is now [`senior-design-organization/knights-sat-sim`](ht
 Use one shared backlog and a weekly plan-and-demo routine. Keep the four epics for foundation, Workspace, Challenges and hosting; use area labels to find UI, server, simulation, hosting and documentation work. Build tickets have a practical starting point, one owner, true prerequisites, an explicit handoff and observable acceptance checks.
 
 Split independently deliverable behaviors while keeping their required failure handling and tests together. The [contribution rules](../../CONTRIBUTING.md#planning-and-board) own the board workflow, ticket format and review procedure. Dates and task status belong in Jira.
+
+Sydney's KSAT-44 station form and Lily's KSAT-45 editor are independently deliverable components; KSAT-18 and KSAT-14 retain real API/Workspace acceptance. Denzel's KSAT-46 implements safe disk operations; KSAT-39 retains owned file API integration. Component and storage checks do not prove live sessions or completion. Keep these implementations in separate feature/modules directories and coordinate shared example-page and dependency-file edits.
+
+Kamilla's KSAT-12 server sessions depend on progress, Sim and runtime foundations, not catalogue presentation. Sydney's KSAT-31 connects those sessions through the KSAT-9 client. KSAT-19's server handoff depends on the verified setup API and replacement operation, not the station form. KSAT-35 verifies a non-author's functional contribution using approved access; KSAT-24's remaining gate-denial checks still belong to final hosted acceptance.
 
 PSB procedure research can proceed separately; unverified real-station instructions do not block the simulated MVP.
 

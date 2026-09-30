@@ -10,10 +10,13 @@ The controller already exists in `server/api/runtime.py`; its script bridge is i
 | --- | --- | --- |
 | KSAT-11 (completed, Diab) | Container creation, storage, isolation, destruction | Real Docker test harness |
 | KSAT-38 (Denzel) | Authorized terminal WebSocket gateway | Controller's existing shell connection |
-| KSAT-39 (Denzel) | Safe read/save/list/download API | Existing Workspace storage |
+| KSAT-46 / KSAT-39 (Denzel) | Safe disk operations / owned read/save/list/download API | Existing Workspace storage; the API reuses the storage module |
+| KSAT-45 (Lily) | Reusable Python/plain-text editor component | Shared controls; real file/terminal integration remains KSAT-14 |
 | KSAT-13 / KSAT-14 / KSAT-32 (Lily) | Browser terminal / editor / files and notes | Gateway 38 and file API 39 |
 | KSAT-15 / KSAT-16 / KSAT-33 / KSAT-34 (Denzel) | Restart/switch, Stop/expiry, reopen, reset | Shared lifecycle ownership from KSAT-12 |
 | KSAT-37 (Diab) | Remove abandoned resources before server readiness | Controller and deployment labels |
+
+Component/module tickets have finite checks without live session APIs. Their integration tickets retain real authorization, stale-save, runtime and browser acceptance. A storage module accepts a trusted root from application code; only the owned API selects that root from the current Attempt/Workspace and serializes final save application with revocation. No Player-selected host path or ungated file route is introduced.
 
 Start with the [lifecycle table](#lifecycle-and-ordering), then the interface section for your ticket. The [glossary](../glossary.md) explains PTY, runtime, generation, atomic saves, and safe path handling. File authorization and cleanup are part of each feature, not optional later polish.
 
@@ -285,8 +288,8 @@ A small contextual map, saved script/recording/log/note downloads, original-byte
 
 - [Project plan](project-plan.md) and [glossary](../glossary.md).
 - [Backend and simulation](backend-and-simulation.md) owns Attempts, script access, and completion. The [operations curriculum](ground-station-training.md#mvp-operations-curriculum) owns the learning tasks, and [Packet format](packet-format-v1.md) owns the packet bytes.
-- [Selected visual handoff](</Users/diab/ksc/PSB GS/mockups/HANDOFF.md>) defines the approved layout. Its fixed packet/terminal output remains illustrative.
-- [Terminal findings](</Users/diab/ksc/PSB GS/prototypes/kss-terminal-feasibility-2026-09-18/server/terminal-prototype/FINDINGS.md>) and [run/cleanup instructions](</Users/diab/ksc/PSB GS/prototypes/kss-terminal-feasibility-2026-09-18/server/terminal-prototype/README.md>) are the retained primary execution evidence.
+- [Frontend workstation requirements](frontend.md#workstation-implementation-handoff-ksat-36) define the shared layout; fixed packet/terminal examples remain illustrative.
+- Historical prototype evidence was retained locally under `PSB GS/mockups/HANDOFF.md` and `PSB GS/prototypes/kss-terminal-feasibility-2026-09-18/server/terminal-prototype/{FINDINGS,README}.md`, outside this repository. Contributors do not need those unpublished files; use the current specifications and [repository checks](../development.md#tests-and-lint).
 - Prototype branch: `prototype/terminal-feasibility-2026-09-18`. Source/evidence commit: `9bd1f30872774ea09fa657b27665bb67e5183cbc`; cleanup-documentation HEAD: `d4407d9f8925b031e8d49da41550caaabed6022d`; base: `7ed045a736ee4d4679df7fae7f76a3af0790fd2f`. Retained locally; not published.
 
 The prototype demonstrated execution, shared files, authenticated byte preservation, reconnect, container replacement, cleanup, and the specific isolation/limit probes in its findings. It used a raw echo fixture, plain HTML, a separate throwaway gateway, interleaved multi-tab terminal input, and last-writer-wins file saves. Actual Sim Service acceptance, operations task verification, completion persistence, and React integration were not demonstrated.
