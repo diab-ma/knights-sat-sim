@@ -44,6 +44,15 @@ Branches separate changes; they do not prevent two people from building the same
 
 In a terminal at the repository root, first run `git status`. If you have existing changes, finish or preserve them before switching branches. Do not discard unfamiliar changes or use `reset --hard` to make this guide work.
 
+Git needs an author name and email for commits. GitHub Desktop can configure these during setup. If Git reports “Author identity unknown,” run these once inside this repository, replacing the examples with your own identity:
+
+```bash
+git config user.name "Your Name"
+git config user.email "your-commit-email"
+```
+
+Use an email associated with your GitHub account, or the private commit email shown in GitHub **Settings → Emails**. These commands affect this repository only; they are not login credentials.
+
 With a clean working folder:
 
 ```bash

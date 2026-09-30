@@ -29,7 +29,11 @@ A placeholder page is the expected result of setup. Specifications describe the 
 
 Install Git and Docker Desktop for your operating system. Start Docker Desktop and wait until its engine is running. On Linux, Docker Engine with the Compose plugin also works.
 
-Open a terminal in the folder where you keep projects, then run:
+This GitHub repository is private. Accept your repository invitation and confirm you can open it while signed in before cloning. If GitHub shows “not found,” ask Diab to check access; a private repository can show that message when you are signed out.
+
+**New to Git authentication?** Use GitHub Desktop: sign in, choose **File → Clone repository → URL**, enter the repository URL below, and choose a local folder. Open a terminal in that cloned folder and run `docker compose up --build`. This avoids creating or pasting access tokens.
+
+If your terminal already has GitHub authentication configured, open it in the folder where you keep projects and run:
 
 ```bash
 git clone https://github.com/senior-design-organization/knights-sat-sim.git
@@ -57,6 +61,7 @@ UI source edits reload automatically. After server or dependency changes, stop a
 | `git` or `docker` not found | Install the missing tool, then reopen the terminal. |
 | Cannot connect to the Docker daemon | Start Docker Desktop and wait for the engine. |
 | No configuration file found | Run `pwd` (PowerShell: `Get-Location`). Change into the cloned folder containing `docker-compose.yml`. |
+| Clone says authentication failed | Use GitHub Desktop sign-in or your existing Git credential manager. Do not enter your GitHub account password as a Git HTTPS password. |
 | Port 5173 or 8000 is already in use | Stop the other development copy or application using that port, then retry. |
 | Page unavailable | Keep Compose running; inspect `docker compose ps` and `docker compose logs --tail=100`. |
 | Docker build fails | Read the first error above the final failure. Share that error and your OS with a teammate; remove secrets before sharing logs. |
