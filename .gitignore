@@ -31,3 +31,6 @@ agents.md
 
 # Host maintenance marker; never part of an image/release.
 deploy/state/
+
+# Local private notes
+/private-admin/
