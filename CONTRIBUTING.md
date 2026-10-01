@@ -29,6 +29,8 @@ The official repository is [senior-design-organization/knights-sat-sim](https://
 
 Keep one accountable assignee. Flag blocked tickets, link the actual prerequisite using **is blocked by**, and explain what is missing. A Player's lesson unlock order is not necessarily developer build order: an isolated test fixture can stand in for an earlier completed lesson when the spec permits it.
 
+Keep selected implementation tickets on the Board even while their status is Backlog. Jira's separate off-board Backlog membership is independent of status: changing an off-board ticket to Ready does not put it on the Board. Before handing someone a Ready ticket, verify its visible card, assignee and completed prerequisites on the actual Board. Leave unselected maintenance and external waits in the separate backlog.
+
 Use the four epics to group foundation, Workspace, Challenges, and hosting. An epic is a group of tickets, not one person's task. Area labels such as `ui`, `server`, `sim`, `hosting`, and `docs` help find work. Select a small weekly goal and show working results at the end; fixed sprints and story points are not required.
 
 ## Before writing code
