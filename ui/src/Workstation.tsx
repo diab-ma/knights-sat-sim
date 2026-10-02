@@ -184,8 +184,7 @@ export function Workstation() {
                 <Terminal aria-hidden="true" />
                 <h3>Terminal not connected</h3>
                 <p>
-                  No shell is running. Terminal access will be available with a
-                  session.
+                  No terminal session is running. Terminal access will be available once a session starts.
                 </p>
               </div>
             </TabsContent>
