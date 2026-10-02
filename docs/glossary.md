@@ -17,11 +17,11 @@ Knight Sat Sim teaches satellite cybersecurity and ground-station operation, inc
 | Packet decoder | A tool that interprets packet bytes as named fields. The MVP supplies this tool; interpreting packets is distinct from recovering them from a radio signal. |
 | Challenge | A practical learning activity within a track, with a Briefing, an observable goal and a Debrief. Basic operations Challenges use task-based completion, without Flag submission; exact success criteria belong to each spec. |
 | Briefing | The story and goal shown before a Challenge. |
-| Attempt | One Player's run of a Challenge, including simulation state, task evidence and packet history. Restart creates a new Attempt. |
-| Practice pass | An on-demand simulated reception scenario shared by Ready for the Pass and Catch and Log. Scenario time is fictional, not the current real-world clock. |
+| Session | One run of one Challenge: simulation state, the Player container, task evidence and packet history. Only one runs at a time, shared by the team. Stop then Start creates a new session. Older documents and the existing script bridge call this an **Attempt**. |
+| Practice pass | A simulated reception scenario described by Ready for the Pass and received in Catch and Log, started on demand. Scenario time is fictional, not the current real-world clock. |
 | Recording | A Player-saved file of the practice pass’s received packets. It is packet data, not radio audio or IQ data. |
 | Session log | Saved context, recording filename, readings and an outcome note for a practice pass. |
-| Workspace | The Player's scripts, recordings, logs, notes, and supplied Challenge resources. Saved authored files survive refresh, Attempt Restart, and Challenge switching during the current session. Stop and expiry clear personal work. |
+| Workspace | The Player's scripts, recordings, logs, notes, and supplied Challenge resources. Saved authored files survive refresh, Stop and Start, and Challenge switching. A host restart may erase them. |
 | Completion | Saved confirmation that the Player met a Challenge’s required goal. For Basic operations, the Platform verifies the task result and records completion without a Flag. |
 | Debrief | The explanation shown after Challenge completion: what happened, what it teaches, and any relevant Defense. The three MVP activities teach operational foundations. |
 | Defense | An optional command check for format, repetition, or authorization. The first demo leaves these off. Minimum parsing and Challenge goal checks still apply. |
@@ -29,7 +29,9 @@ Knight Sat Sim teaches satellite cybersecurity and ground-station operation, inc
 | Mission | The fictional KnightSat story used for the Challenges, separate from real KSC spacecraft and the PSB station. |
 | Mission role | The authority claimed inside a command, such as guest or operator. The claim alone does not authenticate the sender or grant Platform access. |
 | Sandbox | Planned goal-free play with switchable Defenses. It is separate from the required Challenge Workspace. |
-| MVP | The first software demo: Hello, Satellite!, Ready for the Pass, and Catch and Log in Basic operations, all with task-based completion. Offensive and Defensive Challenges are deferred. |
+| MVP | The version we promise to finish: Hello, Satellite!, Ready for the Pass, and Catch and Log in Basic operations, all with task-based completion. The [project plan](specs/project-plan.md#mvp-what-done-means) lists what is required and what is a stretch goal. |
+| Stretch goal | Work we would like to do but do not promise, such as the Offensive and Defensive tracks and PSB station lessons. |
+| Later hardening | Robustness deliberately left out of the MVP, listed in [later hardening](specs/later-hardening.md). |
 
 See the [project plan](specs/project-plan.md) for scope and the [station training plan](specs/ground-station-training.md) for PSB lessons. Definitions of future features do not make those features part of the first demo.
 
@@ -49,22 +51,19 @@ See the [project plan](specs/project-plan.md) for scope and the [station trainin
 | Docker Compose / volume | A configuration that starts related containers / storage mounted into containers. Some volumes are persistent; our Player tmpfs volumes are temporary. |
 | tmpfs / quota | A filesystem held in memory / its maximum permitted size. Restarting the host may erase tmpfs. |
 | PTY / terminal gateway | A pseudo-terminal that lets a program act like an interactive shell / the server code connecting that shell to the browser. |
-| Snapshot / revision | A complete current view / its increasing update number. Reconnect uses a snapshot to recover what was missed. |
+| Polling | The browser asking the server for the current state again every second or so, instead of the server pushing changes. |
 | Authoritative state | The server's checked state, rather than an assumption made by the browser. |
-| Ownership cookie / Origin | A browser token identifying the session owner / the browser page's scheme, hostname, and port. Check both where the contract requires them. |
-| Tab grant / generation / revocation | Permission for one browser tab to make changes / its increasing version / cancellation of that permission. Old queued actions must fail after revocation. |
-| Lock / serialize | Coordination allowing only one conflicting operation at a time / putting those operations in a definite order. |
-| Atomic | Other operations see the change as one unit, not a partially applied result. |
+| Origin | The browser page's scheme, hostname, and port. The server refuses changes from a different Origin. |
+| Lock | Coordination allowing only one conflicting operation at a time, such as Start and Stop. |
 | Async event loop / worker | The server schedules many waiting operations on an event loop. Slow blocking Docker, file, and database calls run in workers so the loop can keep responding. |
 | Migration / transaction | A numbered database structure change / a group of changes that commits together or is rolled back. |
-| File version / SHA-256 | A fingerprint of saved bytes / the hash algorithm used to produce it. A mismatched version prevents overwriting newer content. |
-| Path traversal / symlink | Escaping an allowed folder with a path / a filesystem link to another location. Safe file APIs must prevent both from reaching unauthorized files. |
-| Descriptor-relative access | Open a checked directory, then operate through its handle instead of trusting a path string that could change. Follow the Workspace rules exactly. |
-| Backpressure / bounded queue | Slowing or disconnecting a producer/reader when needed / limiting buffered data so output cannot exhaust memory. |
+| Path traversal / symlink | Escaping an allowed folder with a path such as `../` / a filesystem link to another location. The file routes must refuse both. |
 | CI / SHA / immutable digest | Automated checks / a Git commit identifier / an exact image identifier that does not change when a tag is reused. |
 | Deploy / readiness | Install a tested version on the host / confirm it is safe for the application to accept work. A running process alone is not readiness. |
 | Idempotent / fail closed | Repeating an operation has no extra effect / deny new work when required checks or cleanup cannot be confirmed. |
 | UUID / UTC / RFC 3339 | A standard unique ID / a shared time standard / a timestamp format such as `2026-09-21T18:00:00Z`. |
 | CRC / APID / CCSDS | Packet checksum / packet application identifier / the space-data standards body whose header structure we use. See Packet format v1 for our exact convention. |
+
+Terms used only in [later hardening](specs/later-hardening.md), such as ownership cookie, tab generation, revision, file version and descriptor-relative access, are explained there.
 
 For Git branches, commits, and PRs, use the [contributor walkthrough](../CONTRIBUTING.md#the-whole-process). An unfamiliar term is a reason to ask for an example, not a reason to guess at an authorization or data-loss rule.

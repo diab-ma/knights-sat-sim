@@ -1,6 +1,6 @@
 # Documentation map
 
-You do not need to read every document before starting. Follow the first three rows, then open the specification linked by your ticket. **Required behavior** lives in specifications; **current work/status** lives in Jira; **historical evidence** records only what was checked on its date.
+You do not need to read every document before starting. Follow the first three rows, then open the specification linked by your ticket. The [MVP statement](specs/project-plan.md#mvp-what-done-means) says what is required and what is a stretch goal. **Required behavior** lives in specifications; **current work/status** lives in Jira; **historical evidence** records only what was checked on its date.
 
 | What you need | Read |
 | --- | --- |
@@ -15,6 +15,7 @@ You do not need to read every document before starting. Follow the first three r
 | Implement packet encoding/decoding | [Packet format](specs/packet-format-v1.md) |
 | Build Ready or Catch tasks and evidence checks | [Ground-station training](specs/ground-station-training.md) |
 | Build the supplied PING activity | [Hello, Satellite!](specs/challenges/01-hello-satellite.md) |
+| Check whether something was deliberately left out of the MVP | [Later hardening](specs/later-hardening.md) |
 
 ## How to read a technical specification
 
@@ -23,13 +24,14 @@ You do not need to read every document before starting. Follow the first three r
 3. Use the examples and acceptance checks to decide what to test. “Must” and “use” describe requirements to implement, not proof that code exists.
 4. Ask the owner of the neighboring ticket before changing a shared contract. Update the owning spec with the agreed answer.
 
-For example, `POST /api/attempts` means “send an HTTP POST request to this path.” The adjacent table gives the JSON fields and response. A name such as `AttemptView` refers to the record defined in that same document, not a library you must find online.
+For example, `POST /api/session` means “send an HTTP POST request to this path.” The adjacent table gives the JSON fields and response. A name such as `Session` refers to the record defined in that same document, not a library you must find online.
 
 Tests may use a **fixture**: known sample data that lets one feature be built independently. A fixture does not prove the complete browser-to-server flow works. Final acceptance uses the real connected parts.
 
 ## Background reading: optional for the software MVP
 
 - [Prior art](research/prior-art.md): earlier projects and design references.
+- [Simulator trade study](research/simulator-trade-study.md): why we build our own small simulator instead of NOS3, COSMOS or Yamcs.
 - [CCSDS and Direwolf](research/ccsds-space-packet-and-direwolf-path.md): detailed packet/radio research. The shorter Packet format spec is the implementation authority.
 - [RF bench attenuation](research/rf-bench-attenuation.md): future physical radio work; not needed to run or build the software demo.
 - [Part 97 research](research/part-97-rules.md): regulatory research for later radio work, not authorization to transmit.

@@ -2,7 +2,7 @@
 
 ## Read this for packet work
 
-KSAT-10 builds the encoder/decoder under `server/sim/`; KSAT-17 exposes the public helper in `player/python/kss_client.py`. The simulation folder is currently a placeholder. Other contributors usually only need the [plain-language contract](#plain-language-contract).
+KSAT-10 builds the encoder/decoder under `server/sim/`; the Hello work exposes the public helper in `player/python/kss_client.py`. The simulation folder is currently a placeholder. Other contributors usually only need the [plain-language contract](#plain-language-contract).
 
 Use the tables as the exact byte agreement between sender and receiver. **Hexadecimal** is base-16 notation (`0x10` is decimal 16); **offset** counts bytes from the start of the named structure, beginning at zero. **Big-endian** puts the most significant byte first. **CRC** is a checksum that detects changes, not proof of who sent a packet.
 
@@ -18,7 +18,7 @@ A packet contains an envelope (the CCSDS header), an instruction or reply, and a
 - Commands use one application identifier (APID); replies and periodic telemetry use another.
 - The checksum is always present. Its Defense decides whether an incorrect checksum causes rejection.
 - An interpretable command gets a reply reporting success or a reason for rejection, with current Satellite Sim state. Unreadable packets get feedback in Platform history but no reply packet.
-- A new Attempt starts fresh message numbering. `REBOOT` stays inside the Attempt and preserves message numbering and replay history.
+- A new session starts fresh message numbering. `REBOOT` stays inside the session and preserves message numbering and replay history.
 
 ## Envelope and limits
 
@@ -36,9 +36,9 @@ All multi-byte integers use unsigned big-endian encoding (most significant byte 
 
 The first 16-bit word combines version, type, secondary-header flag and APID. The second combines sequence flags and count. The third is the data-length field. Thus total bytes = data-length field + 7. A v1 command starts with `10 01`, not `18 01` (which would set the secondary-header flag).
 
-The Ground Sim's generated command count starts at zero per Attempt. The Satellite Sim's downlink count also starts at zero per Attempt, shared by replies and periodic telemetry. Each sender advances its own count for each newly generated packet, modulo 16384. Player-crafted packets retain the supplied count; retransmitting captured bytes retains their old count. Counts are not account identities or authorization credentials.
+The Ground Sim's generated command count starts at zero per session. The Satellite Sim's downlink count also starts at zero per session, shared by replies and periodic telemetry. Each sender advances its own count for each newly generated packet, modulo 16384. Player-crafted packets retain the supplied count; retransmitting captured bytes retains their old count. Counts are not account identities or authorization credentials.
 
-`REBOOT` does not reset either count, accepted-command history, or the replay Defense's memory. A new Attempt resets them. The receiver's policy for accepting wrapped or out-of-order counts is later Defense design and is out of MVP; sender wrap does not imply receiver acceptance.
+`REBOOT` does not reset either count, accepted-command history, or the replay Defense's memory. A new session resets them. The receiver's policy for accepting wrapped or out-of-order counts is later Defense design and is out of MVP; sender wrap does not imply receiver acceptance.
 
 ## Command body
 
@@ -76,7 +76,7 @@ Every state snapshot occupies 18 bytes, in this order:
 | 6 | `heater_on` | 1 byte: `0` false, `1` true |
 | 7 | `battery_pct` | 1 byte, integer `0..100`; round down if internal simulation uses fractions |
 | 8 | `uptime_s` | 4 bytes, whole seconds |
-| 12 | `commands_received` | 4 bytes; count of commands accepted for execution in this Attempt |
+| 12 | `commands_received` | 4 bytes; count of commands accepted for execution in this session |
 | 16 | `last_seq_seen` | 2 bytes; sequence of most recently accepted command, `0xFFFF` before any |
 
 Rejected/unreadable submissions are recorded in history, not counted in these two accepted-command fields. `last_seq_seen` is an observation, not by itself the replay Defense's entire memory or highest accepted count. Four-byte counters saturate at `0xFFFFFFFF` rather than rolling over. These choices define wire representation; initial state and battery evolution belong to Challenge design.
@@ -121,7 +121,7 @@ The exact optional-Defense validation order and rejection matrix remain later de
 
 ## Worked Hello, Satellite exchange
 
-This is a deterministic example fixture, not a requirement for every Attempt's initial values. The Ground Sim sends its first command with guest role, no arguments, and no authorization data:
+This is a deterministic example fixture, not a requirement for every session's initial values. The Ground Sim sends its first command with guest role, no arguments, and no authorization data:
 
 ```text
 10 01 c0 00 00 05  01 00 00 00  c0 3e

@@ -6,7 +6,7 @@ The official repository is [senior-design-organization/knights-sat-sim](https://
 
 ## The whole process
 
-**Choose a Ready ticket → create a branch → build and test locally → open a pull request → pass checks and review → merge → verify deployment → mark Done.**
+**Choose a Ready ticket in the current sprint → create a branch → build and test locally → open a pull request → pass checks and review → merge → verify deployment → mark Done.**
 
 | Term | Meaning here |
 | --- | --- |
@@ -19,19 +19,25 @@ The official repository is [senior-design-organization/knights-sat-sim](https://
 
 ## Planning and board
 
+We work in **two-week Jira sprints**, starting Monday 5 October 2026. A sprint is a fixed two-week window with a chosen set of tickets.
+
+- **Sprint planning (first Monday):** each person picks tickets that fit about 10 hours (5 hours a week). Every person should have a next ticket that does not wait on someone else.
+- **During the sprint:** show your progress at the weekly TA check-in. Each ticket says how to demonstrate it.
+- **Sprint review (last Friday):** show what works, move unfinished tickets to the next sprint, and take a screenshot of the sprint board for the course reports.
+
 | Jira status | Use it when |
 | --- | --- |
-| Backlog | The work is planned but has not been selected, or a prerequisite is unfinished. |
+| Backlog | The work is planned but not in the current sprint, or a prerequisite is unfinished. |
 | Ready | The task is clear, its checks are practical, and its real prerequisites are available. |
-| In Progress | Its owner is actively working on it. Start with one implementation ticket per person. |
+| In Progress | Its owner is actively working on it. Work on one ticket at a time. |
 | Review | The PR and test evidence are ready for review. |
 | Done | The acceptance checks, merge/review rules, and applicable delivery check below are satisfied. |
 
-Keep one accountable assignee. Flag blocked tickets, link the actual prerequisite using **is blocked by**, and explain what is missing. A Player's lesson unlock order is not necessarily developer build order: an isolated test fixture can stand in for an earlier completed lesson when the spec permits it.
+Keep one accountable assignee. Flag blocked tickets, link the actual prerequisite using **is blocked by**, and explain what is missing. A Player's unlock order is not the build order: the development unlock lets us build Ready before Hello.
 
-Keep selected implementation tickets on the Board even while their status is Backlog. Jira's separate off-board Backlog membership is independent of status: changing an off-board ticket to Ready does not put it on the Board. Before handing someone a Ready ticket, verify its visible card, assignee and completed prerequisites on the actual Board. Leave unselected maintenance and external waits in the separate backlog.
+**If you are stuck for a day, ask Diab.** Being stuck is normal; waiting silently is what costs time.
 
-Use the four epics to group foundation, Workspace, Challenges, and hosting. An epic is a group of tickets, not one person's task. Area labels such as `ui`, `server`, `sim`, `hosting`, and `docs` help find work. Select a small weekly goal and show working results at the end; fixed sprints and story points are not required.
+Use the four epics to group foundation, Workspace, Challenges, and hosting. An epic is a group of tickets, not one person's task. Area labels such as `ui`, `server`, `sim`, `hosting`, and `docs` help find work. Learning tutorials and course documents are tickets too, labelled `learning` or `course`. Story points are not required.
 
 ## Before writing code
 
@@ -105,7 +111,7 @@ This is internal testing. Updates can interrupt sessions, programs, and unsaved 
 - New behavior has useful tests; docs-only changes have been checked for accuracy and links.
 - The PR names the Jira ticket, explains the result, and records commands/manual checks with outcomes.
 - CI and the review rules above are satisfied, and the PR is merged.
-- For website changes, the deployment is confirmed and the relevant hosted behavior checked. Infrastructure-only work verifies its stated boundary; KSAT-26 owns the complete hosted learner journey.
+- For website changes, the deployment is confirmed and the relevant hosted behavior checked. Infrastructure-only work verifies its stated boundary; the newcomer walkthrough ticket owns the complete hosted learner journey.
 
 Record evidence in the ticket and move it to **Done**. Do not claim a real integration passed because a test double or placeholder worked.
 
@@ -115,11 +121,12 @@ For external setup with no repository change, record the result and have another
 
 Use a deliverable title, such as **UI: Show the Challenge list**, and these short sections:
 
-1. **Goal:** what someone can do after this ticket.
-2. **Start here:** prerequisite tickets, real starting files, and the first small checkpoint. Label files that need to be created.
-3. **Build:** ordered steps and the contract details needed for this slice.
-4. **Check it:** action → expected result, including errors that matter.
-5. **Handoff and references:** who owns adjacent work and exact spec links.
+1. **Goal:** the one result its owner can see in the browser, in a test, or on a page.
+2. **Start here:** prerequisite tickets, real starting files, and the first three steps. Label files that need to be created.
+3. **Learn:** one official doc or tutorial for each new concept. Define technical terms in plain words.
+4. **Build:** ordered steps and the contract details needed for this slice. Aim for about 5 hours of work.
+5. **Check it and show it:** action → expected result, and how to demonstrate it at the TA check-in.
+6. **Handoff and references:** who owns adjacent work and exact spec links.
 
 Keep assignee, status, epic, and blocking relationships in Jira fields. Keep required authorization, cleanup, error handling, and tests with the behavior they protect. Split independent features instead of leaving a large “finish everything” ticket.
 

@@ -26,7 +26,7 @@ npm run dev
 
 Open the same UI and health addresses from the README. Ctrl+C stops each process. `uv sync` and `npm ci` install the versions in the checked-in lockfiles. Keep lockfile changes intentional; do not upgrade packages just to get started.
 
-The current scaffold permits the UI's localhost origin through CORS (the browser's cross-origin access rules). KSAT-9 will add the same-origin Vite API/WebSocket proxy needed by the session features. Do not assume that proxy exists yet.
+The current scaffold permits the UI's localhost origin through CORS (the browser's cross-origin access rules). The Challenge-list work will add the same-origin Vite proxy for `/api` (including the terminal WebSocket). Do not assume that proxy exists yet.
 
 ## Tests and lint
 
@@ -78,7 +78,7 @@ If a check fails only on your computer, include the command, error, OS, and tool
 
 ## Local Player runtime checks (KSAT-11)
 
-This is for changes to the controller, bridge, or Player image. It runs **real local Docker containers**. Browser Start/Stop and real Sim integration belong to KSAT-12 and are not provided by this harness.
+This is for changes to the controller, bridge, or Player image. It runs **real local Docker containers**. Browser Start/Stop and real Sim integration belong to the session work and are not provided by this harness.
 
 From the repository root with Docker running:
 

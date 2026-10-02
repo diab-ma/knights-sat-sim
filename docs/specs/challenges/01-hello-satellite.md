@@ -2,7 +2,7 @@
 
 ## Read this for the first activity
 
-KSAT-17 connects a supplied PING script to the real simulation and saved completion. Start with `player/python/kss_client.py`, the Sim/Link from KSAT-10, the terminal from KSAT-13, and the session/completion services from KSAT-12 and KSAT-8. The complete activity does not exist yet.
+Hello connects a supplied PING script to the real simulation and saved completion. Start with `player/python/kss_client.py`, the Sim/Link (KSAT-10), the browser terminal, the session start/read/stop routes and the progress module. The complete activity does not exist yet.
 
 Read the learner walkthrough first, then [exact goal](#setup-defenses-and-exact-goal) and [acceptance examples](#acceptance-examples). Sending, receiving a reply, verifying the task, and saving completion are four separate events. The UI must tell the learner which actually happened.
 
@@ -23,13 +23,13 @@ A prepared terminal environment, the supplied command with a plain-language expl
 
 The Player runs the provided command and inspects the reply. They do not need to install packages, write Python, fill packet-header fields, calculate a checksum or copy connection credentials for this first exercise. Keep the code editor and shared files available for inspection and later use.
 
-The tool constructs a correctly formed guest-role PING under [Packet format v1](../packet-format-v1.md), sends it through the current Attempt's authenticated internal script connection, and displays the actual response. A PING button or browser packet-building form is not the required learning route. Packet fields and original bytes remain available in a supporting guide/history view, without turning packet construction into the first task.
+The tool constructs a correctly formed guest-role PING under [Packet format v1](../packet-format-v1.md), sends it through the current session's authenticated internal script connection, and displays the actual response. A PING button or browser packet-building form is not the required learning route. Packet fields and original bytes remain available in a supporting guide/history view, without turning packet construction into the first task.
 
 Raw helper submissions still preserve their supplied bytes; the prepared tool's valid-packet construction is not a rule to repair arbitrary Player input. External scripts on a Player's own computer remain outside the MVP.
 
 ### Implementation default
 
-Reuse the prepared `ping_example.py` and Python helper already specified for the Workspace. Show `python ping_example.py` as the command from the Hello folder. The example reads the current Attempt connection details from managed resources so no live credentials are embedded in downloaded code. One invocation sends one PING, waits for the matching reply and prints understandable feedback; it never retries transmission automatically. The [Workspace helper contract](../terminal-workspace.md#implementation-defaults-terminal-and-helper-contracts) defines the connection file and five-second total reply timeout.
+Reuse the prepared `ping_example.py` and Python helper already specified for the Workspace. Show `python ping_example.py` as the command from the Hello folder. The example reads the current session's connection details from managed resources so no live credentials are embedded in downloaded code. One invocation sends one PING, waits for the matching reply and prints understandable feedback; it never retries transmission automatically. The [Workspace helper contract](../terminal-workspace.md#implementation-defaults-terminal-and-helper-contracts) defines the connection file and five-second total reply timeout.
 
 ## Walkthrough and feedback
 
@@ -49,9 +49,9 @@ Start SAFE, antenna not deployed, deployment count 0, heater off, battery 100%, 
 
 The Sim Service records a conforming-PING candidate only after a Player-origin packet has been accepted and is a correctly formed PING under Packet format v1: correct header constants, actual/declared length agreement, valid CRC, recognized role, no arguments, and no authorization data. Any valid sequence count is allowed. This is a goal check, not an enabled rejection Defense. It needs only a PING-conformance check, not the later general Defense framework.
 
-An interpretable PING with a wrong CRC may execute while format validation is off. Show “PING accepted, but the Challenge asks for a correctly formed packet. Check the checksum.” Do not record completion for that packet. Never fabricate a rejection Verdict. Another command, an automatic setup event, or telemetry alone cannot reach the goal. A later correct PING can still succeed in the same Attempt.
+An interpretable PING with a wrong CRC may execute while format validation is off. Show “PING accepted, but the Challenge asks for a correctly formed packet. Check the checksum.” Do not record completion for that packet. Never fabricate a rejection Verdict. Another command, an automatic setup event, or telemetry alone cannot reach the goal. A later correct PING can still succeed in the same session.
 
-The Backend exposes `goal_reached` and attempts to save completion only after the required valid PING has been accepted and its real reply has arrived through the Software Link. Goal detection alone, a submission receipt or unrelated periodic telemetry is insufficient. Commit completion before showing it as saved. Further successful PINGs create no duplicate completion record. Restart resets the Attempt; saved completion remains. Completion follows the shared [task-completion rules](../backend-and-simulation.md#task-completion).
+The Backend exposes `goal_reached` and attempts to save completion only after the required valid PING has been accepted and its real reply has arrived through the Software Link. Goal detection alone, a submission receipt or unrelated periodic telemetry is insufficient. Commit completion before showing it as saved. Further successful PINGs create no duplicate completion record. Stopping and starting again resets the session; saved completion remains. Completion follows the shared [task-completion rules](../backend-and-simulation.md#task-completion).
 
 ## When a beginner gets stuck
 
@@ -63,7 +63,7 @@ The Backend exposes `goal_reached` and attempts to save completion only after th
 | A different command was accepted | “Command accepted. This Challenge asks you to send PING.” |
 | Packet executed but is not correctly formed | Identify the first mismatched goal requirement in plain language; retain the actual success reply. |
 | Nothing came back | “Sent, waiting for a reply.” Connection loss gets a separate notice. Do not claim success from sending alone or automatically resend. |
-| Exchange succeeds but progress cannot be saved | Show that the reply arrived but completion could not be saved. Preserve the received evidence and offer recovery without resending PING automatically. |
+| Exchange succeeds but progress cannot be saved | Show that the reply arrived but completion could not be saved, and ask the Player to run the command again. Never resend PING automatically. |
 
 No points, hint currency, or progressive hint system. The readable labels, guide and error messages are the teaching support.
 
@@ -73,4 +73,4 @@ No points, hint currency, or progressive hint system. The readable labels, guide
 
 ## Acceptance examples
 
-Before calling the implementation complete, demonstrate: a newcomer can run the supplied terminal command without writing Python or configuring credentials; a valid PING and its received reply save completion without a Flag; submission alone cannot complete; wrong-CRC PING can execute without solving; unrelated commands cannot solve; a valid follow-up exchange can solve; refresh retains received history; repeated success does not duplicate completion; failed persistence does not report saved completion. These are future acceptance checks, not tests already executed.
+Before calling the implementation complete, demonstrate: a newcomer can run the supplied terminal command without writing Python or configuring credentials; a valid PING and its received reply save completion without a Flag; submission alone cannot complete; wrong-CRC PING can execute without solving; unrelated commands cannot solve; a valid follow-up exchange can solve; refresh shows the same received history; repeated success does not duplicate completion; failed persistence does not report saved completion. These are future acceptance checks, not tests already executed.

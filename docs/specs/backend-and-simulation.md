@@ -6,52 +6,48 @@ The **Backend** receives browser requests. The **Sim Service** runs the fictiona
 
 Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Add simulation work under `server/sim/`, which is currently a placeholder.
 
-| You are building | Read first | Ticket |
-| --- | --- | --- |
-| Saved completion and Challenge list | [Progress storage](#progress-storage), [storage defaults](#implementation-defaults-simulation-and-storage) | KSAT-8 |
-| Packet simulation | [State and commands](#state-and-commands), [operations](#operations-and-data), Packet format spec | KSAT-10 |
-| Start/control/Stop and event snapshots | [Browser contract](#implementation-defaults-browser-contract), [lifecycle](#lifecycle-and-recovery) | KSAT-12 |
-| Browser provider/session controls and reconnect | [Live updates](#live-updates-and-resynchronization), Frontend shared state | KSAT-31, Sydney; server ownership/events remain KSAT-12, Kamilla |
-| Ready setup / Catch evidence | [Task completion](#task-completion), browser contract, operations curriculum | KSAT-40 / KSAT-22 |
-| Hosting and cleanup | [Hosting defaults](#implementation-defaults-hosting) | KSAT-23 / KSAT-24 / KSAT-37 |
+| You are building | Read first |
+| --- | --- |
+| Saved completion and the Challenge list | [Progress storage](#progress-storage), [storage defaults](#implementation-defaults-simulation-and-storage) |
+| Ready's setup check | [Task completion](#task-completion), [browser contract](#implementation-defaults-browser-contract), [Ready interaction](ground-station-training.md#ready-for-the-pass-agreed-interaction) |
+| Packet simulation | [State and commands](#state-and-commands), [operations](#operations-and-data), Packet format spec |
+| Start, read and stop a session | [Browser contract](#implementation-defaults-browser-contract), [session lifecycle](#session-lifecycle) |
+| Catch's pass and Check work | [Receive-only pass stream](#implementation-defaults-receive-only-pass-stream), [operations evidence](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) |
+| Hosting and cleanup | [Hosting defaults](#implementation-defaults-hosting) |
 
-An API contract below lists a request and its result. For example, a client sends JSON to `POST /api/attempts`; the server returns the new Attempt's snapshot. A **snapshot** is a complete current view. Later WebSocket messages report changes. The [glossary](../glossary.md) explains cookies, locks, versions, and other terms.
+An API contract below lists a request and its result. For example, a client sends JSON to `POST /api/session`; the server returns the new session's state. The [glossary](../glossary.md) explains the terms.
 
-This specification owns simulation state and commands, the Backend/Sim interface, Attempt lifecycle, script access, station practice, and task completion. These are build requirements, not implemented code. The requirements and implementation defaults below record agreed choices.
+This specification owns simulation state and commands, the Backend/Sim interface, the session lifecycle, script access and task completion. These are build requirements, not implemented code. Robustness we chose to leave out of the MVP is in [later hardening](later-hardening.md#backend-and-sessions).
 
-This contract covers all three Basic operations Challenges. The [operations curriculum](ground-station-training.md#mvp-operations-curriculum) owns their tasks and evidence; broader PSB lessons remain later work. No Flag generation, packet or submission route is part of this MVP.
+This contract covers all three Basic operations Challenges. The [operations curriculum](ground-station-training.md#mvp-operations-curriculum) owns their tasks and evidence. No Flag generation, packet or submission route is part of this MVP.
 
 ## Ownership and deployment
 
-The first demo requires a shared, team-only hosted URL as well as local Docker development. Hosted Players need only a browser; execution runs on the host. Use one dedicated Linux server running Docker Compose for the hosted demo, with one active Player. Keep the built React interface, FastAPI/Sim, SQLite storage, and trusted runtime controller on that server; the controller manages isolated Player execution containers.
+The first demo requires a shared, team-only hosted URL as well as local Docker development. Hosted Players need only a browser; execution runs on the host. Use one dedicated Linux server running Docker Compose for the hosted demo, with one session at a time. Keep the built React interface, FastAPI/Sim, SQLite storage, and runtime controller on that server; the controller manages isolated Player execution containers.
 
 Diab maintains the hosting environment privately. Contributors use the approved-email development site and the repository's local setup. VM configuration, private network details, and home-server procedures do not belong in this repository.
 
 Keep the application portable to a Linux Docker host. Validate real Player workloads before claiming hosted capacity. Use only approved free hosting features; do not enable paid services without Diab's approval. Backups remain deferred; retaining a volume through an update is not off-server recovery.
 
-This is the architecture to build, not evidence of a completed shared demo. The Compose setup described below is the local development scaffold; `compose.hosting.yml` separately validates private hosting of the existing placeholder UI and health API. Jira records the remaining application/access checks. Private operational setup is maintained by Diab.
+This is the architecture to build, not evidence of a completed shared demo. The Compose setup described below is the local development scaffold; `compose.hosting.yml` separately validates private hosting of the existing placeholder UI and health API.
 
-One Python server process contains FastAPI and the Sim Service; one Player holds the sole active Attempt. The Sim Service owns Satellite Sim state, packet handling, Ground Sim, Link, scenario playback and packet-goal evidence. FastAPI owns Attempt lifecycle, station-setup/file evidence verification, unlocks, and saved progress. FastAPI calls an asynchronous Python interface and consumes events; it never edits Satellite Sim state directly. These calls return data, not references to mutable simulation objects.
+One Python server process contains FastAPI and the Sim Service, with at most one active session. The Sim Service owns Satellite Sim state, packet handling, Ground Sim, Link, the Catch pass and packet-goal evidence. FastAPI owns the session lifecycle, setup and file checks, unlocks and saved progress. FastAPI calls a Python interface on the Sim; it never edits Satellite Sim state directly. These calls return copies of data, not references to mutable simulation objects.
 
-Browser actions use HTTP to FastAPI; live updates use WebSocket. Generate frontend HTTP request and response types from the FastAPI OpenAPI schema using `openapi-typescript`; the [Frontend HTTP client rules](frontend.md#http-api-types-and-client) define their use. WebSocket event schemas require a separate explicit contract.
+Browser actions use HTTP to FastAPI. The browser learns about changes by reading the session again (see [Reading session state](#reading-session-state)); the terminal uses its own WebSocket. Generate frontend HTTP request and response types from the FastAPI OpenAPI schema using `openapi-typescript`; the [Frontend HTTP client rules](frontend.md#http-api-types-and-client) define their use.
 
-Player scripts enter through the Sim Service's raw endpoint. The terminal PING tool uses that packet path through Ground Sim/Link, preserving supplied bytes. Browser station controls change station configuration, not packet bytes; the separate internal receive stream carries the practice pass delivered through the Software Link.
+Player scripts reach the Sim Service through the restricted script bridge. The terminal PING tool uses that packet path through Ground Sim/Link, preserving supplied bytes. Ready's station form sends settings to FastAPI, not packets; the Catch pass is delivered to the Player's receiver through the Software Link.
 
-The internal service interface does not replace the Software Link. A future separate-process adapter is deferred and will need its own failure/reconnection handling.
+Docker Compose starts `ui` (React development server) and `server` (FastAPI plus Sim Service). Run one server worker. SQLite in a persistent volume stores the shared demo progress.
 
-Docker Compose starts `ui` (React development server) and `server` (FastAPI plus Sim Service). Run one server worker for this in-memory MVP. SQLite in a persistent volume stores the shared demo profile and solved Challenges.
+Satellite Sim state and session packet history are in memory. No separate database server is required. The integrated terminal adds a replaceable Docker execution container, retained Workspace storage, and a terminal WebSocket.
 
-Satellite Sim state and Attempt packet history are in memory. No separate database server is required. The integrated terminal adds a replaceable Docker execution container, independently retained Workspace storage, and an authenticated terminal gateway.
-
-The runtime controller and its local harness exist, but the normal two-service scaffold does not yet connect browser sessions to that infrastructure. The [Workspace contract](terminal-workspace.md#application-and-responsibility-boundaries) defines how it connects to the combined Backend/Sim process.
-
-Implement and accept this boundary in order: KSAT-12 exercises the actual session ASGI application with real runtime/bridge/Sim and temporary progress storage in the disposable Linux harness; KSAT-37 adds startup reconciliation; KSAT-23 packages the runtime-enabled application locally and hosted; KSAT-31 connects and verifies the browser controls/provider. KSAT-23 must supply copyable launch/cleanup commands in `docs/development.md` using the actual application, prepared Player image, trusted mounts, distinct local deployment labels and same-origin HTTP/WebSocket routing. Its real HTTP/WebSocket client checks prove packaging, ownership and cleanup without waiting for browser controls. KSAT-31 then proves the Chrome interaction locally and on the deployed setup. Full learner acceptance remains KSAT-26.
+The runtime controller and its local harness exist, but the normal two-service scaffold does not yet connect sessions to that infrastructure. The [Workspace contract](terminal-workspace.md#application-and-responsibility-boundaries) defines how it connects to the combined Backend/Sim process. Packaging the runtime-enabled application for local use and the hosted site must supply copyable launch and cleanup commands in `docs/development.md`.
 
 ## Updating the hosted demo
 
-The shared URL is an internal development environment. After a successful `main` push CI run publishes immutable images, automatically dispatch **Update website** with that exact commit SHA. PR checks never deploy. Keep the manual workflow for retrying a tested revision. Image publishing and automatic delivery are implemented by KSAT-25. KSAT-23 owns packaging and acceptance of the integrated application features. The existing GitHub Environment is named `production` for credential compatibility; the name does not make this a production service.
+The shared URL is an internal development environment. After a successful `main` push CI run publishes immutable images, automatically dispatch **Update website** with that exact commit SHA. PR checks never deploy. Keep the manual workflow for retrying a tested revision. KSAT-25 implemented image publishing and automatic delivery. The existing GitHub Environment is named `production` for credential compatibility; the name does not make this a production service.
 
-Development updates may interrupt teammate sessions, running programs and unsaved work. Session-safe deployment, atomic idle/admission checks, busy refusal and uninterrupted user sessions are deferred until a later production deployment is in scope. They do not block automatic development updates or the KSAT-35 local-to-live rehearsal. Teammates should save or download work before merging changes they are testing. Access control, runtime isolation, startup cleanup and persistent database storage remain required for the features that use them.
+Development updates may interrupt teammate sessions, running programs and unsaved work. Session-safe deployment is [later hardening](later-hardening.md#deployment-and-sessions). Teammates should save or download work before merging changes they are testing. Access control, runtime isolation, startup cleanup and persistent database storage remain required.
 
 Serialize replacements with cancellation disabled and an exclusive host lock. An older queued revision must not replace a newer deployed revision. GitHub may replace a pending workflow with a newer one; every intermediate commit need not reach the website.
 
@@ -65,7 +61,7 @@ Replace the historical placeholder-only application fingerprint with a fingerpri
 
 Deployment scripts remain root-owned and are upgraded separately. The host refuses unexpected running images and validates the selected main commit, required CI jobs, release artifact, image digests, revision and health before recording success.
 
-The exclusive host lock and persistent maintenance marker remain. Nginx returns 503 for UI and API requests during replacement; `/health` and `/revision` are diagnostic routes behind Access. Image pulls and all release checks precede maintenance. Failure during replacement leaves the marker and pending release record for attended recovery. The progress volume is never removed. These checks prove development delivery and volume retention, not session continuity or implemented Challenge persistence.
+The exclusive host lock and persistent maintenance marker remain. Nginx returns 503 for UI and API requests during replacement; `/health` and `/revision` are diagnostic routes behind Access. Image pulls and all release checks precede maintenance. Failure during replacement leaves the marker and pending release record for attended recovery. The progress volume is never removed. These checks prove development delivery and volume retention, not session continuity.
 
 Use ephemeral GitHub-hosted runners over Tailscale. The automatic dispatcher has only Actions write permission and calls the existing main-only manual workflow after successful main push CI. Its token receives no host credentials.
 
@@ -77,39 +73,36 @@ Keep the short-lived workflow token only in process input and a temporary privat
 
 Use Cloudflare Access with emailed one-time codes for the MVP. Allow only explicitly approved email addresses; possession of any email address does not grant entry. The access gate covers the hosted browser interface, HTTP API, and browser WebSocket connections. The hosted origin must not provide an alternate path that bypasses the gate.
 
-This gate controls entry to the demo, not individual Platform accounts. Keep the shared demo progress profile and the single active Player rule. Passing the gate does not grant control of another browser's Attempt: the existing ownership cookie, controlling-tab rules, and Attempt-bound script credentials remain required.
+This gate controls entry to the demo, not individual Platform accounts. Every approved teammate shares one progress record and the single session slot: any of them can see, use or stop the running session. Per-browser session ownership is [later hardening](later-hardening.md#browser-ownership-and-platform-busy).
 
-Player execution uses the restricted internal script bridge with its existing Attempt credential. Do not place Cloudflare administration credentials or an access-gate bypass credential in Player containers or distributed starters. MVP scripting runs inside the website's Workspace. Connecting scripts from a Player's own computer is deferred, so do not publish an external Player script route or build access-gate integration for local scripts in this release.
+Player execution uses the restricted internal script bridge with its existing per-session credential. Do not place Cloudflare administration credentials or an access-gate bypass credential in Player containers or distributed starters. Connecting scripts from a Player's own computer is deferred, so do not publish an external Player script route.
 
 Individual Platform accounts and per-account progress belong to later work. Cloudflare Access supplies the login experience; the MVP does not implement signup, passwords, or account recovery. Use the [hosting defaults](#implementation-defaults-hosting) for routing, access sessions and deployment mechanics.
 
 ## Progress storage
 
-Use Python's built-in `sqlite3` through one shared progress module. Use parameterized SQL and explicit transactions; no ORM or additional database-access package is required for the first demo. API handlers call named operations to read completed Challenges, save completion, and reset demo progress rather than implementing database handling independently.
+Use Python's built-in `sqlite3` through one shared progress module. Use parameterized SQL and explicit transactions; no ORM or additional database-access package is required. API handlers call named operations to read completed Challenges, save completion, and reset demo progress rather than implementing database handling independently.
 
-KSAT-8 delivers storage/migrations, catalogue models/API and a storage reset primitive. KSAT-12 mounts the public reset route with exact confirmation and the shared idle/Start lock; no ungated reset is exposed before that integration. Sydney's KSAT-31 connects the browser confirmation and authoritative progress refresh. This separates delivery boundaries without weakening the reset checks below.
+- Store shared demo progress in the SQLite database configured by `SQLITE_PATH`, using the persistent volume described above. Live session state and packet history remain in memory. All three MVP activities use the same Challenge completion table.
+- Enforce completion uniqueness in the database so repeating a completed task cannot create duplicate records. Commit completion before reporting success. A database failure must not produce a successful completion response.
+- Open, use and close a connection within one operation. Run database calls with `asyncio.to_thread` (or a plain `def` FastAPI route, which FastAPI runs in a worker) so they do not block the server.
+- Track database structure changes as numbered migrations in the repository. Apply pending migrations in order at startup, recording each applied version in the database, each in one transaction. Repeated startup must not reapply completed migrations. Add a new migration when the schema changes instead of editing an applied one.
 
-- Store shared demo progress in the SQLite database configured by `SQLITE_PATH`, using the persistent volume described above. Live Attempt state and packet history remain in memory. All three MVP activities use the same Challenge completion schema; broader lesson schemas are deferred.
-- Enforce completion uniqueness in the database so repeating a verified task completion cannot create duplicate completion records. Commit completion before reporting success. A database failure must not produce a successful completion response.
-- The module owns connection and transaction lifetimes. Keep synchronous database work off the asynchronous event loop; create, use, and close a connection within the same worker operation. Do not share an arbitrary connection across request threads. Keep transactions short.
-- Track database structure changes as numbered SQL migration files in the repository. Apply pending migrations in order before serving requests, recording successfully applied versions in the database. Apply each migration and its version record in one transaction; roll back that migration and fail startup if it fails. Repeated startup must not reapply completed migrations.
-- Add a new migration when the schema changes instead of editing an already-applied migration. Preserve existing progress during upgrades. Reset demo progress clears the intended progress records; it does not recreate the database or erase migration history.
-
-Automated backups, including scheduled and pre-update backups, are deferred beyond the MVP. Normal restarts and website updates must retain the SQLite progress volume. If the server's storage is lost, shared demo completion may need to be recreated; off-server recovery is not an MVP requirement. Workspace retention and cleanup rules are unchanged.
+Automated backups are deferred beyond the MVP. Normal restarts and website updates must retain the SQLite progress volume. If the server's storage is lost, shared demo completion may need to be recreated.
 
 ## State and commands
 
-State fields are `mode` (SAFE or NOMINAL), `antenna_deployed`, `deploy_count`, `heater_on`, `battery_pct`, `uptime_s`, `commands_received`, and `last_seq_seen`. Hello publishes full-state telemetry once per second; Ready has no live packet feed, and Catch publishes only its finite scenario stream. Encoding, counter limits, and command replies are defined in [Packet format v1](packet-format-v1.md).
+State fields are `mode` (SAFE or NOMINAL), `antenna_deployed`, `deploy_count`, `heater_on`, `battery_pct`, `uptime_s`, `commands_received`, and `last_seq_seen`. Hello publishes full-state telemetry once per second; Ready has no simulator, and Catch publishes only its finite pass. Encoding, counter limits, and command replies are defined in [Packet format v1](packet-format-v1.md).
 
 The six commands are `PING`, `GET_TELEMETRY`, `SET_MODE`, `DEPLOY_ANTENNA`, `SET_HEATER`, and `REBOOT`. Keep this existing packet vocabulary; only PING is required in the learner route. Ready/Catch are receive-only station practice, not additional command exercises. Individual Challenge specs define starting state and exact goals.
 
 `DEPLOY_ANTENNA` marks the simulated antenna deployed and increments `deploy_count` each time it is accepted. An unchanged replay can execute again while replay detection is off. The antenna remains deployed; it does not physically unfold twice.
 
-Message numbering and accepted-command history survive `REBOOT` within an Attempt. A fresh Attempt resets them. The [model defaults](#implementation-defaults-simulation-and-storage) define the remaining reboot effects.
+Message numbering and accepted-command history survive `REBOOT` within a session. A new session resets them. The [model defaults](#implementation-defaults-simulation-and-storage) define the remaining reboot effects.
 
 ## Defenses and model limits
 
-The planned optional Defenses are format validation, replay detection, and authorization. They are off in the operations MVP; the general Defense framework is deferred. Minimum safe parsing and the exact Challenge goal checks are still required.
+The planned optional Defenses are format validation, replay detection, and authorization. They are off in the operations MVP; the general Defense framework is a stretch goal. Minimum safe parsing and the exact Challenge goal checks are still required.
 
 Receiver rules for wrapped or out-of-order message numbers, authorization, and the full rejection order belong to later Defense work. A claimed Mission role does not prove identity.
 
@@ -117,29 +110,25 @@ Hello success does not depend on battery or uptime. The MVP requires no realisti
 
 ## Operations and data
 
-| Internal operation | Input | Output / meaning |
+The Sim Service exposes these Python operations to FastAPI:
+
+| Operation | Input | Output / meaning |
 | --- | --- | --- |
-| `start_attempt` | `attempt_id`, `challenge_id`, server-owned scenario/configuration | `AttemptSnapshot`; initialize one fresh Attempt, or report busy. FastAPI checks unlocks first. No private Flag argument. |
-| `stop_attempt` | `attempt_id`, `reason` | End the Attempt and timers, close script access. Repeated stop is harmless. Release ownership only after coordinated cleanup succeeds. |
-| `send_packet` | `attempt_id`, original `packet_bytes`, server-derived `submission_id` and origin | Submission receipt, not proof of acceptance; preserve malformed bytes. Hello only; reject uplinks in Ready/Catch before Link delivery. Never retry automatically. |
-| `start_pass` | `attempt_id`, verified server-owned setup | Start the finite Catch source once; return current pass state if already started. Requires the current receiver and valid setup. |
-| `read_attempt` / `watch_attempt` | `attempt_id` | Snapshot / ordered event feed of state, original packets, pass status, goal evidence and termination. |
+| `start` | `session_id`, `challenge_id` | Create fresh Hello or Catch simulation state. FastAPI checks unlocks first. |
+| `stop` | `session_id` | End timers and streams. Repeated stop is harmless. |
+| `send_packet` | original `packet_bytes` from the raw script route | Record and deliver the bytes through the Link; return a receipt, not proof of acceptance. Preserve malformed bytes. Hello only; Catch refuses uplinks. Never retry automatically. |
+| `start_pass` | — | Start the 12-packet Catch pass once; return the current pass if already started. Requires a connected receiver. |
+| `read` | — | A copy of current spacecraft state, packet history, pass status and goal evidence. |
 
-`AttemptSnapshot` contains identity, Challenge, lifecycle status, public spacecraft state, packet history and goal evidence. Events identify their Attempt. Station setup, the received-pass manifest and Backend file checks belong to Attempt context; they are not added to the binary spacecraft state. Return copies, not mutable service objects. The browser contract below defines the combined public view.
-
-FastAPI handles browser ownership separately from shared progress: tabs in the active browser reconnect to the same Attempt; a different browser gets Platform busy. The script credential identifies that same Attempt. Within the owning browser, explicit Take control revokes old tab mutations without changing the Attempt or interrupting programs. This tab grant does not replace script authentication.
+Return copies, not mutable service objects. Station setup and file checks are FastAPI's job; they are not part of spacecraft state.
 
 ## Task completion
 
-The [Hello goal](challenges/01-hello-satellite.md#setup-defenses-and-exact-goal) and [operations evidence](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) define success. Hello needs an accepted conforming Player PING and its correlated reply actually received through the Link. Ready needs the explicit successful check of current settings. Catch needs a finished pass, matching saved recording and factual saved log. Neither an HTTP receipt, browser checkbox nor terminal success text is sufficient.
+The [Hello goal](challenges/01-hello-satellite.md#setup-defenses-and-exact-goal) and [operations evidence](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) define success. Hello needs an accepted conforming Player PING and its correlated reply actually received through the Link. Ready needs a check of submitted settings in which every field passes. Catch needs a finished pass, a matching saved recording and a factual saved log. An HTTP receipt, browser checkbox or terminal success text is never enough.
 
-After verifying evidence, FastAPI writes the unique Challenge completion to SQLite. Only committed progress unlocks the next Challenge and shows saved completion/Debrief. **Completion representation:** keep `goal_reached` (verified evidence) distinct from `completion_state = in_progress|save_failed|saved`.
+After verifying evidence, FastAPI writes the Challenge completion to SQLite. Only committed progress unlocks the next Challenge and shows the Debrief. If the write fails, report that the task succeeded but progress was not saved, and ask the Player to repeat the check (or rerun the PING tool). An automatic Retry saving action is [later hardening](later-hardening.md#retry-saving-without-repeating-the-task).
 
-A failed write retains evidence and reports that the task succeeded but progress could not be saved. Explicit Retry saving performs persistence again without resending a packet, rerunning Python or replaying the pass. Recheck Attempt identity and the current setup/file evidence on a Ready/Catch retry; changed or missing evidence clears the unsaved goal and returns to `in_progress`, requiring a new check.
-
-Setup edits also invalidate an unsaved successful setup check. Once saved, completion remains shared progress despite later edits, restarting or an unsuccessful repeat.
-
-**Coordination:** use a per-Attempt operation lock to serialize setup changes, verification, completion persistence and lifecycle revocation; perform bounded file reads/database work in workers without blocking the event loop. A stale operation must not commit for a replacement Attempt. The unique database key makes repeated successful verification harmless. Shared progress and an individual repeat's completion state are separate: starting a completed Challenge creates a fresh local task state without relocking later Challenges.
+Keep `goal_reached` (verified evidence) separate from `completion` (`not_yet`, `saved` or `save_failed`). Use one `asyncio.Lock` around session start/stop and completion saving so a Stop cannot interleave with a save. The unique database key makes repeated successful completion harmless. Starting a completed Challenge again creates fresh task state without relocking later Challenges.
 
 ## Browser API errors
 
@@ -148,159 +137,121 @@ Browser HTTP endpoints use one JSON error envelope with an appropriate non-succe
 ```json
 {
   "error": {
-    "code": "FILE_CONFLICT",
-    "message": "This file changed in the terminal. Your unsaved edits are preserved. Compare the versions or save under another name."
+    "code": "CHALLENGE_LOCKED",
+    "message": "Finish Hello, Satellite! first."
   }
 }
 ```
 
-`code` is a stable machine-readable identifier; frontend logic uses it rather than matching message text. `message` explains the failure in plain language. An optional `field_errors` array inside `error` contains `{ "field": "field_name", "message": "What to correct" }` entries for invalid input. Define this envelope in the Backend schema used to generate frontend HTTP types, including request-validation responses. Unexpected server failures use a safe generic message; diagnostic details stay in server logs.
+`code` is a stable machine-readable identifier; frontend logic uses it rather than matching message text. `message` explains the failure in plain language. An optional `field_errors` array inside `error` contains `{ "field": "field_name", "message": "What to correct" }` entries for invalid input. Define this envelope in the Backend schema used to generate frontend HTTP types. Unexpected server failures use a safe generic message; diagnostic details stay in server logs.
 
-Show failures beside the affected control or panel, with recovery instructions where applicable. Failures requiring Player action remain visible until resolved or dismissed. Preserve entered values and unsaved drafts after a rejected operation. The [Frontend error presentation rules](frontend.md#http-api-types-and-client) also cover network failures.
+Show failures beside the affected control or panel. Preserve entered values and unsaved drafts after a rejected operation. A missing response does not establish whether a change was applied: say the outcome is unknown and never automatically retry. These are Platform errors; Satellite Sim command replies and Defense results keep their existing packet semantics.
 
-A missing response does not establish whether a mutation was applied. Do not turn connection uncertainty into a confirmed rejection or automatically retry the operation. These are Platform errors; Satellite Sim command replies and Defense results keep their existing packet semantics.
+## Reading session state
 
-## Live updates and resynchronization
+The browser asks `GET /api/session` about once per second while a session is running, and after each of its own actions. Each response is the complete current state, including packet history and goal/completion status, so a missed response loses nothing. Reading never reruns a program, resends a packet or repeats an action.
 
-The browser Attempt event connection starts with an authoritative snapshot, then delivers numbered updates. On every reconnect, send a fresh snapshot of the current Attempt, including its current state, packet history, and goal status. Include completion checks and current pass/setup status; never invent task evidence after a disconnect.
+Pushing updates over a WebSocket with numbered revisions and gap recovery is [later hardening](later-hardening.md#live-updates-and-resynchronization).
 
-- Associate each snapshot and update with its Attempt ID. A snapshot identifies the last included event revision; subsequent updates use consecutive increasing revisions within that Attempt. These revisions are browser-event ordering metadata, separate from packet sequence numbers.
-- Coordinate snapshot capture and event subscription under the same serialization boundary. Send the snapshot first, then all later updates in order, so a change during connection setup cannot fall between the snapshot and the stream. A disconnected HTTP read followed by an unrelated subscription is insufficient.
-- After installing a snapshot, ignore duplicate or older updates. Apply only the next expected revision for that Attempt. A revision gap triggers a fresh snapshot and stream synchronization rather than guessing the missing state. Ignore messages from superseded connections or Attempts, including late snapshots.
-- During disconnection or resynchronization, label retained readings as stale. Mark them current only after the authoritative snapshot has been installed. If the Attempt has ended, report that outcome instead of restoring stale state or starting a replacement automatically.
-- Reconnecting restores observation only. It never reruns a program, resends a packet, or repeats an uncertain HTTP mutation. Terminal attachment follows its separate Workspace contract.
+## Session lifecycle
 
-The first demo does not require a durable browser-event replay log. This does not remove the required in-memory Attempt packet history. The [browser contract](#implementation-defaults-browser-contract) defines event payloads alongside the HTTP API.
+A **session** is one run of one Challenge: a fresh Sim state, a Player container (for Hello and Catch) and its packet history. Only one session runs at a time, shared by all approved teammates.
 
-## Lifecycle and recovery
+- **Start** (`POST /api/session`) checks that the Challenge is unlocked and no session is running, then creates the Sim state, the Player container with its starter files and connection file, and binds the script bridge. Ready needs no session.
+- **Read** (`GET /api/session`) returns the current state, or `null` when nothing is running.
+- **Stop** (`DELETE /api/session`) revokes the script credential, stops the bridge and Sim, and destroys the container including background processes. Authored files are kept for the next session. If cleanup fails, keep the slot unavailable and report it; Stop can be repeated.
 
-Changing the viewed Challenge page does not change the active Attempt. Start/Switch actions explicitly request lifecycle changes; the [Frontend navigation rules](frontend.md#navigation-and-active-attempt) distinguish browsing from switching the active Challenge.
+Restarting or switching Challenges is Stop followed by Start. A new session gets a new ID, credential, packet history and (for Catch) pass. Viewing another Challenge's page does not change the running session.
 
-Stop ends the session: terminate Player execution, invalidate access, clear personal Workspace data, then release the slot. Explain the deletion consequence before Stop and provide script, recording and log/notes downloads. Restart or switching Challenges stops old programs and the old Attempt, retains Workspace-authored files, and creates a new ID, fresh state, and fresh packet history; replace supplied Attempt resources.
+If the server process crashes or restarts, the unfinished session ends; saved completion remains. At startup, before reporting healthy, remove any leftover Player container and bridge belonging to this deployment ([controller handoff](terminal-workspace.md#controller-integration-handoff)). Connection loss never triggers an automatic packet resend, because retransmission can change the Challenge outcome.
 
-Preserve exclusive ownership across these transitions. Old connections/events cannot control the replacement. Solved progress remains.
-
-Challenge settings come from server-owned configuration; arbitrary Defense toggles belong to the later Sandbox.
-
-FastAPI coordinates these Workspace and execution transitions; they do not move filesystem or terminal responsibilities into the Satellite Sim. The [Workspace contract](terminal-workspace.md) specifies accepted behavior. Reset workspace requires confirmation, erases personal files, restores starters, and starts a new Attempt while retaining solved progress. Runtime-only failure recovery is explicit and leaves the current Satellite Sim state intact.
-
-End an idle session after 30 minutes without Player activity, terminate execution, and clear personal Workspace data before releasing the slot. A live watching page, accepted terminal input/file saves, explicit setup/pass/check actions, or packet submissions through the raw endpoint keep the Attempt alive; autonomous telemetry, receive-only stream traffic, terminal output, and idle sockets do not.
-
-A receive-only pass lasts seconds; leaving an idle receiver open cannot hold ownership indefinitely. Closing one tab does not end it. Refresh reconnects, fetches current state/history, and resumes updates.
-
-The implementation must retain goal status in the snapshot so a missed event cannot lose success detection.
-
-A Python server crash ends unfinished Attempts; personal Workspace recovery is not guaranteed and abandoned execution/data must be cleaned up before reuse. Show “Attempt ended—start again”; retain saved solved Challenges. Connection uncertainty never triggers an automatic packet resend, because retransmission can itself change the Challenge outcome. An explicit Reset demo progress action clears shared solved progress under the idle-only contract below.
+Idle expiry, reopening only the terminal, and resetting the Workspace are [later hardening](later-hardening.md#lifecycle-extras).
 
 ## Script access
 
-### Connecting and owning an Attempt
+### Connecting a script to the session
 
-- The Challenge page shows the Workspace's script connection address and a copyable script access credential for its active Attempt. Use `/raw/attempts/{attempt_id}` for Hello or `/receive/attempts/{attempt_id}` for Catch through the restricted internal bridge. These connection details are for scripts running in the Workspace, not a publicly reachable endpoint for a Player's own computer. Hosted browser WebSockets use `wss://`; the private bridge transport follows the [Workspace isolation contract](terminal-workspace.md#execution-storage-and-endpoint-isolation). The raw handler belongs to the Sim Service in the existing Python server. No separate TCP port per Attempt or exposed modem interface is needed for the MVP.
-- The Web Backend recognizes the browser through an opaque, server-issued ownership cookie, shared across tabs and refreshes. It is HttpOnly, SameSite=Lax, and Secure when hosted over HTTPS. Browser control requests and browser WebSocket connections validate ownership and origin. Shared demo progress does not grant ownership.
-- A different browser receives “Platform busy.” Losing the ownership cookie does not let a browser take over the current Attempt; it waits for that Attempt to stop or expire under the existing lifecycle rules. Account-based recovery is deferred.
-- The script credential is an independently generated, unpredictable secret bound to one Attempt, obtainable only by its owning browser. Send it as `Authorization: Bearer <credential>` in the WebSocket opening request, never in the URL or inside a Space Packet. The credential grants this Attempt’s internal script access; it is distinct from the packet’s claimed Mission role.
-- Stop, Restart, Challenge switch, timeout, or server failure invalidates old access. Restart supplies a new Attempt ID and credential. Close old sockets and check that an Attempt is still active before delivering queued packets, so old traffic cannot affect its replacement.
-- Browser terminal/editor control uses the [Workspace controlling-tab rules](terminal-workspace.md). Taking control in another tab does not invalidate the active Attempt's script credential or interrupt running programs. The browser tab grant never replaces the raw endpoint's bearer authentication.
-- Browser controls and scripts operate on the same Attempt and packet history. Hello permits multiple raw observers with ordered command ingestion. Catch permits one receive-stream subscriber; additional receivers get `RECEIVER_BUSY`. Ready exposes no packet connection. A reconnect never automatically resends a command. Mere idle script connections do not count as Player activity; packet submissions do. A watching browser retains the keepalive behavior in [Lifecycle and recovery](#lifecycle-and-recovery).
+- The Player's scripts connect through the restricted internal bridge to `/raw/attempts/{session_id}` for Hello or `/receive/attempts/{session_id}` for Catch. The existing bridge names this path segment "attempts"; the session ID fills it. These routes are only for scripts in the Workspace, not a public endpoint for a Player's own computer. The raw handler belongs to the Sim Service in the existing Python server.
+- The script credential is an unpredictable secret generated for one session. Scripts read it from `/attempt/connection.json` and send it as `Authorization: Bearer <credential>` when opening the WebSocket, never in the URL or inside a Space Packet. It is distinct from the packet's claimed Mission role.
+- Stop or a server failure invalidates the credential. Close old sockets and check that the session is still active before delivering queued packets, so old traffic cannot affect a new session.
+- Hello permits multiple raw connections with commands processed one at a time. Catch permits one receiver; a second gets `RECEIVER_BUSY`. Ready has no script connection. A reconnect never automatically resends a command.
 
 ### Packet delivery and helper
 
 The binary-message rules below apply to Hello’s raw connection. Catch uses the receive-only JSON stream defined in the next section.
 
-- After authentication, one binary WebSocket message contains exactly one complete Space Packet, including header and CRC. Use message boundaries, not the packet's declared length, to delimit submissions. WebSocket fragmentation does not create additional packets.
-- Preserve supplied bytes through Ground Sim and the selected Link, including intentionally incorrect headers or CRCs. Enforce the existing 256-byte maximum. Oversize submissions are rejected before Link delivery; other malformed bytes follow the minimum parsing rules in Packet format v1. Never silently fix, renumber, or retry a packet.
+- After authentication, one binary WebSocket message contains exactly one complete Space Packet, including header and CRC. Use message boundaries, not the packet's declared length, to delimit submissions.
+- Preserve supplied bytes through Ground Sim and the Link, including intentionally incorrect headers or CRCs. Enforce the existing 256-byte maximum. Oversize submissions are rejected before Link delivery; other malformed bytes follow the minimum parsing rules in Packet format v1. Never silently fix, renumber, or retry a packet.
 - Each received Satellite Sim packet is a binary WebSocket message. Text messages are reserved for Platform feedback, such as a local parsing error, and must not be presented as Satellite Sim replies. Packet history retains original bytes, direction, and time. Delivery to the Link is not proof that the command was accepted.
-- Ship a small Python helper under `player/python/` and examples under `player/examples/` in the planned project repository. Preinstall the helper and supply starter files and guidance in the embedded execution environment so Players need neither the private repository nor local installation. Catch and Log uses the embedded editor and general terminal. A separate local-installation helper bundle is not required for the MVP; recording, log, saved-script and note downloads remain available. [Workspace lifecycle rules](terminal-workspace.md) govern provisioning, access, files, and recovery.
-- The helper connects, sends exact bytes, receives packets and Platform feedback, and provides the required PING builder and packet decoder. Its raw-send function never rewrites bytes. Examples cover connecting, sending a PING, and inspecting replies; Catch’s starter handles connection setup but leaves receiving/saving and selecting log readings to the Player. Byte construction utilities may be shared with the server, but no server-private configuration or internals are included in the download.
+- Ship a small Python helper in `player/python/` and examples in `player/examples/`, preinstalled in the Player image so Players need neither the repository nor local installation.
+- The helper connects, sends exact bytes, receives packets and Platform feedback, and provides the PING builder and packet decoder. Its raw-send function never rewrites bytes. Catch’s starter handles connection setup but leaves receiving, saving and selecting log readings to the Player. Byte construction utilities may be shared with the server, but no server-private configuration is included.
 
 ### Implementation defaults: receive-only pass stream
 
-The [Workspace receive helper](terminal-workspace.md#implementation-defaults-terminal-and-helper-contracts) defines the JSON messages for Catch. Use the same Attempt-bound bearer opening header and revocation checks as raw access. The internal listener exposes only these two script routes; neither is mounted on the public browser app. Authenticate first, then validate Challenge and current Attempt. Reject Player uplink data on the receive stream. No Cloudflare bypass or infrastructure credential is supplied.
+The [Workspace receive helper](terminal-workspace.md#implementation-defaults-terminal-and-helper-contracts) defines the JSON messages for Catch. Use the same bearer credential and revocation checks as raw access. The internal listener exposes only the two script routes; neither is mounted on the public browser app. Reject Player uplink data on the receive stream.
 
-The Sim Service forwards Link-delivered telemetry, retaining original bytes and per-pass metadata. Browser history, helper output and grading manifest must describe the same actual deliveries. Publish receiver readiness only after authenticated subscription is installed. Serialize subscription/disconnection and Start pass so it cannot begin against a stale readiness flag. Bound the receive subscriber to 64 messages of at most 4 KiB; overflow or loss while running interrupts the pass rather than silently dropping records. The UI and stream report the interruption; no automatic stream replay.
+The Sim Service forwards Link-delivered telemetry, retaining original bytes and pass metadata. Browser history, helper output and the grading manifest describe the same deliveries. Report the receiver as ready only after its authenticated connection is registered. If the receiver disconnects while the pass is running, mark the pass interrupted; never silently drop records or replay the stream.
 
 ## Challenge goals
 
-Use [Challenge progression](project-plan.md#challenge-progression) for the three server-enforced IDs and prerequisites. Exact goals belong to the Hello and operations specs, not a separate security ladder.
+Use [Challenge progression](project-plan.md#challenge-progression) for the three server-enforced IDs and prerequisites. Exact goals belong to the Hello and operations specs.
 
-**Correlation:** the raw handler assigns a fresh server `submission_id` and origin `raw_player` to every deliberate binary message. Generated downlinks use origin `satellite`; scenario packets also carry `pass_run_id` and index metadata. Never trust origin or internal correlation IDs supplied by a Player. These are internal history metadata, not extra Space Packet bytes. Correlate each reply to its actual ingestion event, not merely the reusable 14-bit wire sequence. Preserve original bytes, acceptance result and received reply evidence. A command can execute without meeting Hello's conformance goal; never fabricate a rejection Verdict. Raw retransmissions remain deliberate new commands, with no automatic deduplication or retry.
+**Correlation:** the raw handler assigns a fresh server `submission_id` and origin `raw_player` to every binary message it receives. Generated downlinks use origin `satellite`; pass packets also carry `pass_run_id` and index metadata. Never trust origin or correlation IDs supplied by a Player; these are internal history metadata, not extra packet bytes. Correlate each reply to its actual submission, not merely the reusable 14-bit wire sequence. A command can execute without meeting Hello's conformance goal; never fabricate a rejection Verdict. Repeated transmissions are deliberate new commands, with no automatic deduplication or retry.
 
 ## Implementation defaults: browser contract
 
-Use these interfaces for the first implementation slices. Browser routes use `/api`; the internal script endpoints are never mounted on that public application. JSON field names are snake_case. Attempt, Workspace, runtime, tab and pass IDs are UUID strings; Challenge/scenario IDs are the stable slugs specified by the curriculum. Times are UTC RFC 3339 strings, and packet bytes lowercase hexadecimal without spaces. Hex fields represent history and recordings; raw uplinks remain binary. Apply the 256-byte packet limit before delivery and validate hex when checking recordings.
+Browser routes use `/api`; the script routes are never mounted on that public application. JSON field names are snake_case. Session and pass IDs are UUID strings; Challenge IDs are `hello-satellite`, `ready-for-the-pass` and `catch-and-log`. Times are UTC RFC 3339 strings, and packet bytes are lowercase hexadecimal without spaces.
 
-**Shared records.** `Progress` is `{completed_challenge_ids: string[]}`. A `Challenge` is `{challenge_id, title, availability: available|locked, prerequisite_ids: string[], completed: boolean}`; include exactly the three MVP IDs and compute availability on the server. `Control` is `{tab_id: string|null, generation: integer}`. `Check` is `{field, passed: boolean, message}`. `PassView` is `{scenario_id, pass_run_id, status: not_started|running|finished|interrupted, receiver_ready: boolean, received_count: integer}`.
+**Shared records.** `Progress` is `{completed_challenge_ids: string[]}`. A `Challenge` is `{challenge_id, title, availability: available|locked, prerequisite_ids: string[], completed: boolean}`; include exactly the three MVP IDs and compute availability on the server. `Check` is `{field, passed: boolean, message}`. `StationSetup` is defined in the [Ready preparation defaults](ground-station-training.md#implementation-defaults-practice-pass-and-evidence). `PassView` is `{pass_run_id, status: not_started|running|finished|interrupted, receiver_ready: boolean, received_count: integer}`.
 
-`AttemptView` contains `{attempt_id, workspace_id, challenge_id, status, state, goal_reached, completion_state, checks: Check[], station_setup: StationSetup|null, setup_verified: boolean, pass: PassView|null, runtime_status, runtime_id, control, last_activity_at}`. Lifecycle `status = preparing|active|failed|ending`; `runtime_status = starting|ready|failed|stopped`, with nullable `runtime_id`. `completion_state` follows Task completion above.
+`HistoryEntry` is `{time, direction: uplink|downlink, packet_hex, origin: raw_player|satellite, pass_index: integer|null, feedback: {code, message}|null}`. Retain original packets including unreadable submissions. Feedback is Platform explanation, never a fabricated reply or Verdict.
 
-`state` uses the model fields, string mode, booleans and integer counters; `last_seq_seen` is null before acceptance (binary `0xffff`). Hello has null station/pass; Ready has station setup only; Catch has both. Preparing ends only when required managed files and runtime are available.
-
-Station readiness, runtime readiness, and saved completion are distinct.
-
-A `HistoryEntry` has `{entry_id, time, direction: uplink|downlink, packet_hex, origin: raw_player|satellite, submission_id: string|null, pass_run_id: string|null, index: integer|null, scenario_time: string|null, feedback: {code, message}|null}`. Use a per-Attempt increasing `entry_id`; retain original packets including unreadable submissions. Link replies to actual submissions; autonomous telemetry has no submission ID. Pass metadata is null outside Catch. Feedback is Platform explanation, never a fabricated reply or Verdict. `Snapshot` is `{view: AttemptView, history: HistoryEntry[], progress: Progress, revision: integer}`. No bearer credential belongs in these records.
+`Session` is `{session_id, challenge_id, status: starting|running|failed, state, history: HistoryEntry[], pass: PassView|null, goal_reached: boolean, completion: not_yet|saved|save_failed, checks: Check[]}`. `state` uses the model fields, string mode, booleans and integer counters; `last_seq_seen` is null before any accepted command. Hello has a null pass. No bearer credential belongs in these records.
 
 | Method and path | Request → successful response |
 | --- | --- |
 | `GET /api/challenges` | `{challenges: Challenge[], progress: Progress}` |
-| `GET /api/session` | `{status: idle\|owned\|busy\|maintenance, attempt_id: string\|null, workspace_id: string\|null}`; only the owner receives IDs. No personal data for busy browsers. |
-| `POST /api/attempts` | `{challenge_id, tab_id}` → 201 `Snapshot`; acquire the idle slot and set the ownership cookie. Never replace a running Attempt through this route. |
-| `GET /api/attempts/{id}` | Owner → `Snapshot`. |
-| `POST /api/attempts/{id}/control` | Owner supplies `{tab_id}` → `Control`; explicit Take control atomically increments generation. |
-| `POST /api/attempts/{id}/actions` | `{action: restart\|switch\|stop\|reset_workspace\|reopen_runtime, challenge_id?: string}` → `{snapshot: Snapshot\|null}`; `challenge_id` required only for switch; stop returns null after cleanup. |
-| `PUT /api/attempts/{id}/station-setup` | Ready only, complete `StationSetup` → `Snapshot`; validates types/ranges, saves even semantically wrong training choices and clears `setup_verified`. |
-| `POST /api/attempts/{id}/setup/check` | Ready only, `{}` → `Snapshot` with per-field checks; all passing verifies setup and attempts to save completion. |
-| `POST /api/attempts/{id}/pass/start` | Catch only, `{}` → `Snapshot`; requires correct setup and attached receiver. Never restarts an existing pass. |
-| `POST /api/attempts/{id}/work/check` | Catch only, `{recording_path, recording_version, log_path, log_version}` → `Snapshot` with evidence checks and completion state. Paths are relative to the authored Catch folder. |
-| `POST /api/attempts/{id}/completion/retry` | `{}` → `Snapshot`; retry only previously verified unsaved completion, subject to current evidence validation. |
-| `GET /api/attempts/{id}/script-access` | Owner → `{url, credential, protocol: raw\|receive}` or 409 `SCRIPT_UNAVAILABLE` for Ready; `Cache-Control: no-store`. Managed helper configuration uses the same values. |
-| `POST /api/attempts/{id}/activity` | Visible owning page heartbeat → 204, at most once every 30 seconds; observers in that browser may keep it alive. |
-| `POST /api/progress/reset` | `{confirm: "RESET DEMO PROGRESS"}` → `Progress`; allowed only while idle, atomically excluding new ownership. Available to any approved teammate; local development follows the same rule. |
+| `GET /api/challenges/ready-for-the-pass/brief` | `{scenario_id, brief: StationSetup, starting_setup: StationSetup}` |
+| `POST /api/challenges/ready-for-the-pass/check` | `StationSetup` → `{checks: Check[], completion: not_yet\|saved\|save_failed}`; every field passing saves completion. Locked if Hello is not complete. |
+| `POST /api/session` | `{challenge_id}` → 201 `Session` for Hello or Catch. |
+| `GET /api/session` | `{session: Session\|null}` |
+| `DELETE /api/session` | Stop → 204. |
+| `POST /api/session/pass/start` | Catch only, `{}` → `Session`; requires a connected receiver. Never restarts an existing pass. |
+| `POST /api/session/work/check` | Catch only, `{recording_path, log_path}` → `Session` with evidence checks and completion. Paths are relative to the Catch folder. |
+| `POST /api/progress/reset` | `{confirm: "RESET DEMO PROGRESS"}` → `Progress`; refused while a session is running. |
 
-Every owner-only route checks the cookie. HTTP reads reject a different Origin when present; mutations and WebSocket handshakes require the exact allowed Origin. Do not enable cross-origin credentialed access; every mutation of an active Attempt except explicit Take control and heartbeat also requires `X-Tab-Id` and `X-Control-Generation`.
+Mutations and the terminal WebSocket require the request's `Origin` header, when present, to match the site's own origin. Do not enable cross-origin credentialed access.
 
-Start establishes generation 1. Restart, Switch and Reset workspace preserve the controlling tab but increment its generation. Validate a requested Challenge, its availability and any Ready → Catch handoff before revoking the current Attempt; an invalid Switch leaves the running session intact.
+A wrong setup or answer is a successful evaluation with failed checks, not a transport error. A verified task whose database write failed returns 503 `STORAGE_UNAVAILABLE`.
 
-Store tab ID and current grant in sessionStorage; a new tab must generate its own ID, including when opened from another tab. Recheck grants and Attempt identity when applying queued work. Use one lifecycle lock for ownership/admission/transitions; serialize Sim packet ingestion and snapshot/subscription together.
+Errors use the common envelope: 403 `INVALID_ORIGIN`; 409 `SESSION_ACTIVE`, `NO_SESSION`, `CHALLENGE_LOCKED`, `WRONG_CHALLENGE`, `RECEIVER_REQUIRED`, `RECEIVER_BUSY`, `PASS_ALREADY_STARTED` or `EVIDENCE_REQUIRED`; 413 `TOO_LARGE`; 422 `INVALID_INPUT`; 503 `RUNTIME_UNAVAILABLE`, `CLEANUP_FAILED` or `STORAGE_UNAVAILABLE`. Unknown resources use 404. Disable controls that cannot work in the current state, and enforce the same rules on the server. No browser packet builder, packet-submission or Flag route is required.
 
-File and terminal work use the same revocation boundary. Do not hold the event loop during Docker or filesystem operations.
-
-A wrong setup/answer is successful evaluation with failed checks, not a transport error. A verified task whose database write failed returns 503 `STORAGE_UNAVAILABLE`; the subsequent snapshot exposes `save_failed` and retained checks/evidence. Each check reads the current server-owned setup.
-
-For Check work, use the Workspace's checked descriptor/path rules and per-file locks, read both bounded files into immutable buffers and match their content hashes to the supplied versions. Validate these buffers, never execute them. A different/moving file gives 409 `FILE_CONFLICT`; the shell is not a collaborative lock participant, so the check certifies the captured versions, not all future writes.
-
-Retain validated hashes/context for Retry saving; if either current file differs, require a new Check work. Hold the logical Attempt operation lock through validation and the database commit; no lifecycle replacement can overtake persistence.
-
-Errors use the common envelope: 403 `NOT_OWNER`, `INVALID_ORIGIN` or `NOT_CONTROLLER`; 409 `PLATFORM_BUSY`, `STALE_CONTROL`, `CHALLENGE_LOCKED`, `FILE_CONFLICT`, `SETUP_REQUIRED`, `RECEIVER_REQUIRED`, `RECEIVER_BUSY`, `SCRIPT_UNAVAILABLE`, `WRONG_CHALLENGE`, `EVIDENCE_REQUIRED`, `PASS_ALREADY_STARTED` or `TRANSITION_IN_PROGRESS`; 410 `ATTEMPT_ENDED`; 413 `TOO_LARGE`; 422 `INVALID_INPUT`; 503 `RUNTIME_UNAVAILABLE`, `CLEANUP_FAILED`, `MAINTENANCE` or `STORAGE_UNAVAILABLE`. Unknown resources use 404. Grant loss is distinct from a stale file version. Disable affected mutation controls while stale/disconnected; always enforce the same restrictions server-side. No browser packet builder, packet-submission or Flag route is required.
-
-**Attempt WebSocket:** `/api/attempts/{id}/events`, owner cookie and Origin required. Server first sends `{type: "snapshot", attempt_id, revision, data: Snapshot}` with matching inner revision. Each subsequent `{type: "update", attempt_id, revision, data: {view: AttemptView, history_append: HistoryEntry[], progress: Progress}}` replaces the small public view and appends only new packets. Increment revision for every published update, including control/readiness/progress changes; send no separate private event type. On termination send `{type: "ended", attempt_id, revision, reason}` then close normally. An HTTP read can recover current state but does not substitute for the atomic WebSocket snapshot/subscription. Reconnect with a fresh snapshot; back off 1, 2, 4, 8, then 15 seconds maximum while the page is visible. Never replay mutations.
-
-Define these records once with Pydantic, including a discriminated union for event `type`. Explicitly include the event models in OpenAPI `components.schemas` for TypeScript generation; do not invent HTTP routes to make them appear. Check in generated TypeScript, and make CI export/regenerate and fail on a difference. The browser connection module checks event type, IDs, integer revision and required fields before dispatch; invalid messages trigger a visible protocol failure and fresh synchronization. See [OpenAPI TypeScript schema guidance](https://openapi-ts.dev/advanced).
+Define these records once with Pydantic and generate the TypeScript types from OpenAPI. Regenerate and check in the types whenever the schema changes; a CI check for stale types is [later hardening](later-hardening.md#generated-types-ci-check).
 
 ## Implementation defaults: simulation and storage
 
-- Use a deterministic Software Link with ordered delivery, no artificial latency, drops or contact windows. Process one command at a time. Use real reply delivery for Hello evidence. Ground Sim and downlink sender counts follow the packet spec; helper-generated raw input retains its supplied sequence as Player-crafted bytes; Catch uses its finite scenario source instead of the live timer.
-- For Hello, keep battery at its initial 100%. Uptime is whole elapsed monotonic seconds since Attempt start or the latest REBOOT. REBOOT sets SAFE, heater off and uptime zero; preserves battery, physical antenna state, deployment/accepted-command counts, goal latch and all Attempt/sequence history. It is itself an accepted command. No battery-related command gating or asynchronous reboot downtime.
-- First SQLite migration creates `schema_migrations(version INTEGER PRIMARY KEY)` and `challenge_completion(challenge_id TEXT PRIMARY KEY, completed_at TEXT NOT NULL)`. There is one shared profile, so no user/account table. Completion insert is conflict-ignore; preserve the first UTC completion timestamp. Reset deletes completion rows only. Each connection uses a 5-second busy timeout; serialize short writes through the shared module. Use SQLite's default rollback journal for this single-process MVP; add WAL only if measurements justify it.
+- Use a deterministic Software Link with ordered delivery, no artificial latency, drops or contact windows. Process one command at a time. Use real reply delivery for Hello evidence. Ground Sim and downlink sender counts follow the packet spec; helper-generated raw input retains its supplied sequence; Catch uses its finite pass instead of the live timer.
+- For Hello, keep battery at its initial 100%. Uptime is whole elapsed seconds since session start or the latest REBOOT. REBOOT sets SAFE, heater off and uptime zero; preserves battery, physical antenna state, deployment/accepted-command counts, goal evidence and all sequence history. It is itself an accepted command. No battery-related command gating or reboot downtime.
+- The first migration creates `schema_migrations(version INTEGER PRIMARY KEY)` and `challenge_completion(challenge_id TEXT PRIMARY KEY, completed_at TEXT NOT NULL)`. There is one shared profile, so no user/account table. Completion insert ignores conflicts and keeps the first UTC completion timestamp. Reset deletes completion rows only. Each connection uses a 5-second busy timeout.
+- `DEV_UNLOCK_ALL=1` makes all three Challenges available without writing completion, so Ready and Catch can be built and shown before Hello works. Use it locally and on the development site only until Hello works; turn it off before the newcomer walkthrough. Unlock rules and their tests stay in the code.
 - No future lesson tables, account migrations, background job system or general Defense framework are prerequisites for the operations MVP.
 
 ## Implementation defaults: hosting
 
-- Validate the actual application's runtime limits on the selected Linux host before the one-active-Player demo. Diab owns host operation; host maintenance and private network configuration are outside contributor documentation.
-- Serve the built UI, `/api` and browser WebSockets on one origin through an Nginx Compose service. Proxy API/WebSocket traffic to the single server worker; use SPA fallback only for UI routes. Local Vite proxies `/api` (including WS) to the server for the same cookie behavior. Backend readiness is `/health`; return 503 until migrations and abandoned-resource cleanup finish.
-- Use a Cloudflare Tunnel from that origin with no public application ports; keep SSH as a separate key-authenticated management path. Cloudflare Access gates the whole hostname with the approved-email list and a 6-hour session. Enable HttpOnly and binding cookies for this browser-only Access application; keep SSH on its separate Tailscale path. Restrict origin ingress to the tunnel service and validate the Access JWT at the origin against the configured audience/issuer, signature and expiry, following [Cloudflare’s validation contract](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/). Tunnel/Access configuration is operational setup, not a Player secret. If access expires, preserve drafts, explain reauthentication, then reconnect; never infer an expired Attempt or resubmit work from an access-gate redirect.
+- Validate the actual application's runtime limits on the selected Linux host before the demo. Diab owns host operation; host maintenance and private network configuration are outside contributor documentation.
+- Serve the built UI, `/api` and the terminal WebSocket on one origin through an Nginx Compose service. Proxy API/WebSocket traffic to the single server worker; use SPA fallback only for UI routes. Local Vite proxies `/api` (including WebSocket) to the server. Backend readiness is `/health`; return 503 until migrations and leftover-container cleanup finish.
+- Use a Cloudflare Tunnel from that origin with no public application ports; keep SSH as a separate key-authenticated management path. Cloudflare Access gates the whole hostname with the approved-email list and a 6-hour session. Enable HttpOnly and binding cookies for this browser-only Access application; keep SSH on its separate Tailscale path. Restrict origin ingress to the tunnel service and validate the Access JWT at the origin against the configured audience/issuer, signature and expiry, following [Cloudflare’s validation contract](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/). Tunnel/Access configuration is operational setup, not a Player secret. If access expires, preserve drafts and explain reauthentication; never resubmit work from an access-gate redirect.
 - Build revision-tagged images in GitHub Actions and pull them from GHCR. Successful main CI automatically dispatches the deployment workflow with its immutable commit; the workflow checks that exact SHA's required checks. Serialize deployments with cancellation disabled; connect over SSH using GitHub Environment secrets. No self-hosted Actions runner or Docker administration endpoint is reachable from Player code.
-- A host deployment command takes an exclusive deployment lock and places a persistent maintenance marker outside the containers before replacement. Keep the database volume; verify startup readiness and the deployed revision, then clear maintenance. Development updates may interrupt sessions and do not require a deployment admission socket. Failure leaves maintenance visible for attended recovery. Access-gated Nginx serves the maintenance page even if the API is restarting.
-- Before the first shared demo, verify Access denial, origin bypass prevention, browser and terminal WebSockets, resource limits, an automatic update, serialized replacements, and progress surviving a restart. Private host setup is separate from these application requirements. KSAT-24 validates the selected host and access; KSAT-25 must establish a secure deployment management path to the deployment target.
+- A host deployment command takes an exclusive deployment lock and places a persistent maintenance marker outside the containers before replacement. Keep the database volume; verify startup readiness and the deployed revision, then clear maintenance. Development updates may interrupt sessions. Failure leaves maintenance visible for attended recovery. Access-gated Nginx serves the maintenance page even if the API is restarting.
+- Before the shared demo, verify Access denial, origin bypass prevention, the terminal WebSocket, resource limits, an automatic update, and progress surviving a restart. KSAT-24 validated the host and access gate; KSAT-25 established the deployment path.
 
 ## Acceptance checks
 
-- A successful main push CI run automatically deploys that tested revision without an operator clicking Run workflow. Failed or PR CI never triggers deployment. The development update may interrupt active sessions; it retains persistent progress storage and clears maintenance only when healthy. Concurrent updates cannot overlap or downgrade a newer deployed revision. Session continuity and busy refusal are later production requirements.
-- Verify fresh database initialization, repeated startup, upgrades preserving completion, and rollback/startup failure on a failed migration. Repeated valid completion creates one record; failed persistence never reports success. Reset progress preserves the database schema and migration history.
-- Disconnect around an accepted PING and its reply, then reconnect: the snapshot restores current state and received history without a duplicate command. Verify snapshot/stream handoff during concurrent updates, duplicate revisions, revision gaps, and late messages from superseded connections or Attempts.
-- Verify browser controls and script actions use the same Attempt; Hello replies and Catch packets in history match actual Link deliveries. Reconnect must not resend packets.
-- Reject control from a different browser, invalid origins, and wrong or expired script credentials. Ended Attempts must reject queued traffic and cannot affect replacements.
-- Reject false completion from submission alone, incorrect settings, missing/old recordings or wrong log facts. Failed persistence does not unlock the next Challenge; Retry saving never reruns a packet or pass.
-- Refresh restores state, history, and goal status. Restart replaces state, pass identity and access while preserving solved progress. A server crash ends the unfinished Attempt but retains saved completion.
-- Reset demo progress restores the initial Challenge progression; it is separate from Reset workspace, which preserves completion.
-- Check every internal operation and raw delivery rule above, plus [Hello](challenges/01-hello-satellite.md#acceptance-examples), [operations activities](ground-station-training.md#mvp-acceptance-checks), and [Workspace lifecycle and fault checks](terminal-workspace.md#focused-integration-and-fault-checks).
+- A successful main push CI run automatically deploys that tested revision. Failed or PR CI never deploys. The update keeps persistent progress and clears maintenance only when healthy. Concurrent updates cannot overlap or downgrade a newer deployed revision.
+- Fresh database initialization and repeated startup work; a failed migration stops startup. Repeated valid completion creates one record; failed persistence never reports success or unlocks the next Challenge. Reset progress keeps the schema and migration history and is refused while a session runs.
+- Locked Challenges cannot be checked or started; `DEV_UNLOCK_ALL` unlocks without saving completion.
+- Start creates one session; a second Start returns `SESSION_ACTIVE`. Stop removes the container and background processes, rejects the old script credential, and keeps authored files. A failed cleanup keeps the slot unavailable.
+- Browser actions and scripts use the same session; Hello replies and Catch packets in history match actual Link deliveries. Reading state never resends packets.
+- Reject false completion from submission alone, incorrect settings, missing/old recordings or wrong log facts.
+- A server restart ends the unfinished session, removes leftover containers and retains saved completion.
+- Check every operation and raw delivery rule above, plus [Hello](challenges/01-hello-satellite.md#acceptance-examples), [operations activities](ground-station-training.md#mvp-acceptance-checks), and [Workspace checks](terminal-workspace.md#acceptance-checks).
