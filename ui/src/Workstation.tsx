@@ -199,7 +199,7 @@ export function Workstation() {
               <div className="workspace-empty">
                 <BookOpen aria-hidden="true" />
                 <h3>Notes not available yet</h3>
-                <p>Session notes will be saved in your Workspace.</p>
+                <p>Your session notes will be saved to your Workspace.</p>
               </div>
             </TabsContent>
           </Tabs>
