@@ -61,7 +61,7 @@ export function ChallengePage() {
       </section>
       <section className="guide-section" aria-labelledby="completion-title">
         <h2 id="completion-title">Task completion</h2>
-        <p>Shared progress has not been loaded. No completion is reported.</p>
+        <p>Shared progress feature has not yet been completed.</p>
       </section>
       <section className="guide-section" aria-labelledby="debrief-title">
         <h2 id="debrief-title">Debrief</h2>
