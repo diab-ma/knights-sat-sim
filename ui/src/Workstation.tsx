@@ -208,7 +208,7 @@ export function Workstation() {
             aria-labelledby="sim-state-title"
           >
             <h2 id="sim-state-title">Satellite Sim state</h2>
-            <p>No session connected. Telemetry is unavailable.</p>
+            <p>No session connected. Telemetry is not available.</p>
           </section>
         </section>
         <main id="main-content" className="guide-pane" tabIndex={-1}>
