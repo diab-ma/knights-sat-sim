@@ -21,7 +21,7 @@ A UCF Senior Design project for practicing satellite communication in a browser.
 ### Quick start
 
 ```bash
-git clone https://github.com/senior-design-organization/knights-sat-sim.git
+git clone https://github.com/diab-ma/knights-sat-sim.git
 cd knights-sat-sim
 docker compose up --build
 ```

@@ -131,7 +131,7 @@ We build the Challenges in a different order from the one Players use, so that t
 
 Players still play Hello → Ready → Catch. Track real prerequisites with Jira blocking links; a Player's unlock order does not block development.
 
-The official repository is [`senior-design-organization/knights-sat-sim`](https://github.com/senior-design-organization/knights-sat-sim), imported with all Git branches and history from the personal repository. Historical pull requests and CI evidence remain at their original URLs. The agreed baseline was originally published to `kamillamamatova/knight-sat-sim`, at [c7e742a](https://github.com/kamillamamatova/knight-sat-sim/commit/c7e742a0b663a97694f5691bf1a3773fdca3ba07).
+The official repository is [`diab-ma/knights-sat-sim`](https://github.com/diab-ma/knights-sat-sim), moved with all Git branches and history from [`senior-design-organization/knights-sat-sim`](https://github.com/senior-design-organization/knights-sat-sim), which is archived. Historical pull requests and CI evidence remain at their original URLs there. The agreed baseline was originally published to `kamillamamatova/knight-sat-sim`, at [c7e742a](https://github.com/kamillamamatova/knight-sat-sim/commit/c7e742a0b663a97694f5691bf1a3773fdca3ba07).
 
 We plan in two-week Jira sprints, starting Monday 5 October 2026. Keep the four epics for foundation, Workspace, Challenges and hosting; use area labels to find UI, server, simulation, hosting and documentation work. Course documents and learning tutorials are tickets too. The [contribution rules](../../CONTRIBUTING.md#planning-and-board) own the sprint routine, ticket format and review procedure. Dates and task status belong in Jira.
 

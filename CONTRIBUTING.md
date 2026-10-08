@@ -2,7 +2,7 @@
 
 Use this guide to take one ticket from local work to the shared development website. No AI tools are required. Start by [running the project](README.md#run-locally).
 
-The official repository is [senior-design-organization/knights-sat-sim](https://github.com/senior-design-organization/knights-sat-sim). Keep its visibility unchanged. Build tickets live in [Jira](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1), not GitHub Issues.
+The official repository is [diab-ma/knights-sat-sim](https://github.com/diab-ma/knights-sat-sim). Build tickets live in [Jira](https://seniordesign-g20.atlassian.net/jira/software/projects/KSAT/boards/1), not GitHub Issues.
 
 ## The whole process
 
@@ -95,7 +95,7 @@ Open the repository on GitHub and choose **Compare & pull request**. Set the bas
 
 ## Updating the shared website
 
-A merge starts this chain in [GitHub Actions](https://github.com/senior-design-organization/knights-sat-sim/actions):
+A merge starts this chain in [GitHub Actions](https://github.com/diab-ma/knights-sat-sim/actions):
 
 1. **CI** checks the new `main` commit and publishes its tested images.
 2. **Automatically update development website** requests the update.
