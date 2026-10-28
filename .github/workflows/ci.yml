@@ -27,11 +27,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t knightsat-player:ksat11 player
-      - run: docker compose -p ksat11-test -f compose.runtime-test.yml build
-      - run: docker compose -p ksat11-test -f compose.runtime-test.yml run --rm runtime-tests
+      - run: python3 scripts/check.py runtime
       - if: always()
         run: docker compose -p ksat11-test -f compose.runtime-test.yml down -v
+
+  dev-environment:
+    name: Portable development and containerized checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -p knightsat-dev-ci up --build --detach --wait --wait-timeout 120
+      - run: python3 scripts/check.py server
+      - run: python3 scripts/check.py ui
+      - if: failure()
+        run: docker compose -p knightsat-dev-ci logs
+      - if: always()
+        run: docker compose -p knightsat-dev-ci down
 
   ui:
     name: TypeScript lint and tests
