@@ -303,15 +303,6 @@
   height: 100%;
   padding: 12px;
 }
-.terminal-example {
-  height: 320px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-.terminal-example .terminal-panel {
-  box-sizing: border-box;
-}
 .workspace-empty {
   min-height: 100%;
   display: flex;
