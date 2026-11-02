@@ -36,6 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import TerminalPanel from "@/features/terminal/TerminalPanel";
 
 export default function ComponentExamples() {
   const [name, setName] = useState("");
@@ -131,6 +132,16 @@ export default function ComponentExamples() {
             to enter the panel.
           </TabsContent>
         </Tabs>
+      </section>
+      <section className="space-y-4" aria-labelledby="terminal-example-title">
+        <h2 id="terminal-example-title">Terminal</h2>
+        <p>
+          Local echo demo. Typed text is displayed in this browser; no server
+          session is connected.
+        </p>
+        <div className="terminal-example">
+          <TerminalPanel />
+        </div>
       </section>
       <section className="space-y-4">
         <h2>Dialog, AlertDialog and Tooltip</h2>

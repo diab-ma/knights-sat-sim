@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TerminalPanel from "@/features/terminal/TerminalPanel";
 
 // Briefing previews only. KSAT-9 replaces these with the server catalogue;
 // availability and completion must never be inferred from this list.
@@ -179,14 +180,12 @@ export function Workstation() {
                 Notes
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="terminal" keepMounted>
-              <div className="workspace-empty">
-                <Terminal aria-hidden="true" />
-                <h3>Terminal not connected</h3>
-                <p>
-                  No terminal session is running. Terminal access will be available once a session starts.
-                </p>
-              </div>
+            <TabsContent
+              value="terminal"
+              keepMounted
+              className="terminal-workspace"
+            >
+              <TerminalPanel />
             </TabsContent>
             <TabsContent value="editor" keepMounted>
               <div className="workspace-empty">
