@@ -2,6 +2,46 @@
 
 Use [README setup](../README.md#run-locally) first. Run commands from the cloned repository unless a step tells you to enter a subfolder. Commands here work in macOS/Linux terminals and PowerShell; do not copy the surrounding Markdown fences.
 
+## Compose development
+
+`docker-compose.yml` is the portable development configuration, not the hosted deployment. It contains both source mounts, hot reload, localhost-only published ports, and readiness checks; no machine-specific override is needed. Python's locked development dependencies live outside the source mount. The UI's named dependency volume is refreshed when `package-lock.json` changes.
+
+```bash
+docker compose up --build --detach --wait --wait-timeout 120
+docker compose logs -f
+```
+
+Stop with `docker compose down`, **without `-v`**, to preserve the SQLite development database. Rebuild after Python dependency or Dockerfile changes. Keep [compose.hosting.yml](../compose.hosting.yml) separate; it does not use source mounts or development tools.
+
+## Remote Docker (optional)
+
+You can keep editing on a laptop while a separate Linux development machine runs Docker. SSH access, source synchronization, and localhost port forwarding are machine configuration, not repository secrets or checked-in IP addresses. Never point development or runtime checks at the shared hosted backend.
+
+On Diab's configured Mac, from this checkout:
+
+```bash
+prodesk up
+prodesk check
+```
+
+`prodesk up` syncs source, builds on the development VM, waits for readiness, and forwards the UI/API back to the usual localhost addresses. `prodesk check` syncs first, then runs the check command below on that VM. Select an area with `prodesk check server`, `prodesk check ui`, or `prodesk check runtime`; `prodesk check runtime --match bridge` selects matching runtime tests.
+
+`prodesk dev` starts a foreground source watcher for another checkout. The configured primary checkout is already watched automatically. Use `prodesk logs -f` for logs and `prodesk down` to stop the development app without deleting its database. Other contributors can run the same checked-in Compose configuration locally or use their own SSH/sync runner; the helper is not a project dependency. Only one checkout can publish the default UI/API ports on a Docker host at a time.
+
+A remote Docker context alone does **not** share laptop folders. Run Compose and checks beside the synchronized checkout on the development VM, or use a runner that handles synchronization. Runtime checks require the Docker host's socket and bind paths.
+
+## Containerized checks
+
+With Docker running, one command runs Python lint/type checks and unit tests, UI lint/tests/build, then the real Player-runtime harness:
+
+```bash
+python3 scripts/check.py
+```
+
+Use `python` in PowerShell. Choose `server`, `ui`, or `runtime` as an argument for focused work. These checks use locked dependencies in disposable containers; Python/Node test dependencies and build outputs need not be installed on the laptop. The ordinary check containers have no application-data volumes, source mounts, or Docker socket. Runtime tests use only their dedicated harness described below.
+
+The runner removes its check containers/networks after success or failure. Only the disposable runtime harness uses volume-deleting cleanup; it never prunes Docker or deletes the ordinary development database. A host-wide runtime lock prevents concurrent harness runs across checkouts. After a hard interruption, inspect the labelled runtime containers before removing a stale `knightsat-ksat11-test.lock` directory from that Docker host's temporary directory.
+
 ## Run without Compose
 
 This option is useful when your editor needs local dependencies. Install **Python 3.12**, **uv** (the Python dependency tool), and **Node.js 22** (includes npm). These match our container/CI versions. Docker is still required for real Player runtime tests.
@@ -80,18 +120,15 @@ If a check fails only on your computer, include the command, error, OS, and tool
 
 This is for changes to the controller, bridge, or Player image. It runs **real local Docker containers**. Browser Start/Stop and real Sim integration belong to the session work and are not provided by this harness.
 
-From the repository root with Docker running:
+From the repository root with Docker running (or `prodesk check runtime` on the configured remote development machine):
 
 ```bash
-docker build -t knightsat-player:ksat11 player
-docker compose -p ksat11-test -f compose.runtime-test.yml build
-docker compose -p ksat11-test -f compose.runtime-test.yml run --rm runtime-tests
-docker compose -p ksat11-test -f compose.runtime-test.yml down -v
+python3 scripts/check.py runtime
 ```
 
-The final command deletes **only this disposable harness's** volumes and network. Its `-p ksat11-test -f compose.runtime-test.yml` options matter. Never replace it with a broad Docker prune or use `down -v` on your ordinary development stack.
+The runner builds the Player image and locked test image, runs the tests, then uses `docker compose -p ksat11-test -f compose.runtime-test.yml down -v` to delete **only this disposable harness's** volumes and network. Those project/file selectors matter. Never replace them with a broad Docker prune or use `down -v` on your ordinary development stack.
 
-Run the harness serially: its three named volumes are shared by the test deployment. To select a test, append `pytest tests/runtime/test_controller.py -k NAME -v` to the `run --rm runtime-tests` command, replacing `NAME` with part of a test name.
+Run the harness serially: its three named volumes are shared by the test deployment. To select tests, use `python3 scripts/check.py runtime --match NAME`, replacing `NAME` with part of a test name. An expression matching no tests returns a nonzero result, not a passing check.
 
 The trusted test server mounts the local Docker socket; the Player container never receives it. The authored, managed, and bridge storage volumes are bounded in-memory filesystems. Runtime replacement preserves authored contents; ending a session removes personal data and all execution, including detached processes.
 

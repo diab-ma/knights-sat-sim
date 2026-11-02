@@ -3,7 +3,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci && sha256sum package-lock.json > node_modules/.knightsat-lock
 
 COPY . .
 

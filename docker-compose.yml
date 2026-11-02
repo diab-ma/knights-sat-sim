@@ -1,25 +1,65 @@
 services:
   server:
     build: ./server
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 1
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       SQLITE_PATH: /data/progress.sqlite
     volumes:
       - sqlite-data:/data
+      - ./server:/app
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
   ui:
     build: ./ui
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    restart: unless-stopped
+    # A named node_modules volume survives rebuilds. Refresh it only when its
+    # lockfile changes, rather than silently reusing stale dependencies.
+    command:
+      - sh
+      - -ec
+      - |
+        checksum="$$(sha256sum package-lock.json)"
+        if [ ! -f node_modules/.knightsat-lock ] || [ "$$(cat node_modules/.knightsat-lock)" != "$$checksum" ]; then
+          npm ci --no-audit --no-fund
+          printf '%s\n' "$$checksum" > node_modules/.knightsat-lock
+        fi
+        exec npm run dev -- --host 0.0.0.0 --port 5173
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       VITE_API_URL: http://localhost:8000
     volumes:
       - ./ui:/app
       - ui-node-modules:/app/node_modules
     depends_on:
-      - server
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, --input-type=module, -e, "const r = await fetch('http://127.0.0.1:5173/'); if (!r.ok) process.exit(1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Disposable check containers have no source mounts or application volumes.
+  server-check:
+    profiles: [checks]
+    build: ./server
+    cpus: 1.5
+    mem_limit: 2g
+    command: [sh, -ec, "ruff check .; mypy --ignore-missing-imports api; pytest"]
+  ui-check:
+    profiles: [checks]
+    build: ./ui
+    cpus: 1.5
+    mem_limit: 2g
+    command: [sh, -ec, "npm run lint; npm test; npm run build"]
 
 volumes:
   sqlite-data:

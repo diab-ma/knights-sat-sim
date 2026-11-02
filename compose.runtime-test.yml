@@ -3,7 +3,8 @@ services:
   runtime-tests:
     build:
       context: ./server
-      dockerfile: tests/runtime/Dockerfile
+      target: development
+    command: [pytest, tests/runtime, -v]
     environment:
       RUNTIME_DEPLOYMENT: ksat11-test
       RUNTIME_AUTHORED_VOLUME: ksat11-test-authored

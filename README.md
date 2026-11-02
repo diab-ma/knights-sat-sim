@@ -23,13 +23,15 @@ A UCF Senior Design project for practicing satellite communication in a browser.
 ```bash
 git clone https://github.com/diab-ma/knights-sat-sim.git
 cd knights-sat-sim
-docker compose up --build
+docker compose up --build --detach --wait --wait-timeout 120
 ```
 
 - UI: [http://localhost:5173](http://localhost:5173) — opens the workstation with Briefing previews and empty Workspace panels.
 - Server: [http://localhost:8000/health](http://localhost:8000/health) — returns `{"status":"ok"}`.
 
-Docker installs the application dependencies; local setup needs no `.env` file or private server keys. Stop with **Ctrl+C**, then run `docker compose down` (without `-v`, which deletes local data). For native setup and test commands, see [Development](docs/development.md).
+Docker installs the locked application and development dependencies; local setup needs no `.env` file or private server keys. Both the UI and Python server reload when source files change. The command waits for both health checks; use `docker compose logs -f` for logs and `docker compose down` to stop (without `-v`, which deletes local data).
+
+Run all containerized checks with `python3 scripts/check.py` (`python` in PowerShell). For the optional remote Docker workflow, focused checks, and native editor setup, see [Development](docs/development.md).
 
 Playable Challenges, terminal execution, saved files and progress are not connected yet. UI contributors can use `/dev/components` in development; see the [workstation handoff](docs/specs/frontend.md#workstation-implementation-handoff-ksat-36).
 
