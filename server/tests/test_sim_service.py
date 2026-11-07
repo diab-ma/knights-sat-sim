@@ -22,8 +22,11 @@ from sim.service import (
     HELLO,
     READY,
     Direction,
+    Downlink,
     NoSession,
     PacketKind,
+    Receiver,
+    Reentry,
     SessionActive,
     SimService,
     SimSnapshot,
@@ -53,10 +56,27 @@ def sim(time: ManualTime) -> SimService:
     return service
 
 
+def sending(
+    sim: SimService, packets: list[bytes], session_id: str = SESSION
+) -> Receiver:
+    """A script connection that sends each packet at once and confirms it."""
+
+    def receive(downlink: Downlink) -> None:
+        packets.append(downlink.packet)
+        sim.confirm_delivery(session_id, downlink.delivery_id)
+
+    return receive
+
+
+def queueing(queue: list[Downlink]) -> Receiver:
+    """A script connection whose sends happen later (or never)."""
+    return queue.append
+
+
 @pytest.fixture
 def received(sim: SimService) -> list[bytes]:
     packets: list[bytes] = []
-    sim.attach_receiver(SESSION, packets.append)
+    sim.attach_receiver(SESSION, sending(sim, packets))
     return packets
 
 
@@ -370,7 +390,7 @@ def test_new_session_starts_fresh(
     sim.stop(SESSION)
     sim.start("session-2", HELLO)
     fresh: list[bytes] = []
-    sim.attach_receiver("session-2", fresh.append)
+    sim.attach_receiver("session-2", sending(sim, fresh, "session-2"))
     # Bytes queued by the old session's connection cannot reach the new one.
     with pytest.raises(NoSession):
         sim.send_packet(SESSION, WORKED_PING)
@@ -496,12 +516,12 @@ def test_send_requires_the_running_session(time: ManualTime) -> None:
 
 
 def test_failing_receiver_does_not_block_others(sim: SimService) -> None:
-    def broken(packet: bytes) -> None:
+    def broken(downlink: Downlink) -> None:
         raise ConnectionError
 
     good: list[bytes] = []
     sim.attach_receiver(SESSION, broken)
-    sim.attach_receiver(SESSION, good.append)
+    sim.attach_receiver(SESSION, sending(sim, good))
     sim.send_packet(SESSION, WORKED_PING)
     assert good == [WORKED_REPLY]
     assert snapshot(sim).goal.goal_reached
@@ -509,10 +529,161 @@ def test_failing_receiver_does_not_block_others(sim: SimService) -> None:
 
 def test_detached_receiver_gets_nothing(sim: SimService, time: ManualTime) -> None:
     packets: list[bytes] = []
-    receiver_id = sim.attach_receiver(SESSION, packets.append)
+    receiver_id = sim.attach_receiver(SESSION, sending(sim, packets))
     sim.detach_receiver(receiver_id)
     time.advance(2)
     assert packets == []
+
+
+# Handoff is not delivery: Hello needs a reply actually sent to the script
+
+
+def test_queued_reply_counts_only_once_sent(sim: SimService) -> None:
+    queue: list[Downlink] = []
+    sim.attach_receiver(SESSION, queueing(queue))
+    receipt = sim.send_packet(SESSION, WORKED_PING)
+
+    [reply] = queue
+    assert reply.packet == WORKED_REPLY
+    view = snapshot(sim)
+    assert not view.goal.goal_reached
+    assert not view.history[-1].delivered
+
+    assert sim.confirm_delivery(SESSION, reply.delivery_id)
+    view = snapshot(sim)
+    assert view.goal.goal_reached
+    assert view.goal.submission_id == receipt.submission_id
+    assert view.history[-1].delivered
+
+
+def test_reply_lost_before_sending_never_solves(sim: SimService) -> None:
+    # The script disconnects while the reply waits in its queue.
+    queue: list[Downlink] = []
+    receiver_id = sim.attach_receiver(SESSION, queueing(queue))
+    sim.send_packet(SESSION, WORKED_PING)
+    sim.detach_receiver(receiver_id)
+    assert not snapshot(sim).goal.goal_reached
+    assert [entry.delivered for entry in snapshot(sim).history] == [True, False]
+
+
+def test_stale_unknown_and_repeated_confirmations_are_ignored(
+    sim: SimService,
+) -> None:
+    queue: list[Downlink] = []
+    sim.attach_receiver(SESSION, queueing(queue))
+    sim.send_packet(SESSION, WORKED_PING)
+    [reply] = queue
+
+    assert not sim.confirm_delivery("other-session", reply.delivery_id)
+    assert not sim.confirm_delivery(SESSION, "unknown-delivery")
+    assert not snapshot(sim).goal.goal_reached
+    assert sim.confirm_delivery(SESSION, reply.delivery_id)
+    assert not sim.confirm_delivery(SESSION, reply.delivery_id)
+
+
+def test_confirmation_after_stop_cannot_solve_a_new_session(sim: SimService) -> None:
+    queue: list[Downlink] = []
+    sim.attach_receiver(SESSION, queueing(queue))
+    sim.send_packet(SESSION, WORKED_PING)
+    [old_reply] = queue
+    sim.stop(SESSION)
+    sim.start(SESSION, HELLO)  # Even reusing the same ID.
+
+    assert not sim.confirm_delivery(SESSION, old_reply.delivery_id)
+    assert not snapshot(sim).goal.goal_reached
+
+
+def test_unsolicited_confirmation_of_a_nonconforming_reply_does_not_solve(
+    sim: SimService,
+) -> None:
+    queue: list[Downlink] = []
+    sim.attach_receiver(SESSION, queueing(queue))
+    sim.send_packet(SESSION, encode_command(CommandCode.GET_TELEMETRY, 0))
+    [reply] = queue
+    assert sim.confirm_delivery(SESSION, reply.delivery_id)
+    view = snapshot(sim)
+    assert view.history[-1].delivered
+    assert not view.goal.goal_reached
+
+
+def test_telemetry_confirmation_marks_history_only(
+    sim: SimService, time: ManualTime
+) -> None:
+    queue: list[Downlink] = []
+    sim.attach_receiver(SESSION, queueing(queue))
+    time.advance(1)
+    [telemetry] = queue
+    assert sim.confirm_delivery(SESSION, telemetry.delivery_id)
+    view = snapshot(sim)
+    assert view.history[-1].kind is PacketKind.TELEMETRY
+    assert view.history[-1].delivered
+    assert not view.goal.goal_reached
+
+
+# Receivers may only enqueue; calling back in cannot reorder or outlive Stop
+
+
+def test_receiver_cannot_send_during_a_handoff(sim: SimService) -> None:
+    errors: list[Exception] = []
+    first: list[bytes] = []
+    second: list[bytes] = []
+
+    def resend(downlink: Downlink) -> None:
+        first.append(downlink.packet)
+        try:
+            sim.send_packet(SESSION, WORKED_PING)
+        except Reentry as error:
+            errors.append(error)
+            raise
+
+    sim.attach_receiver(SESSION, resend)
+    sim.attach_receiver(SESSION, sending(sim, second))
+    sim.send_packet(SESSION, WORKED_PING)
+
+    assert len(errors) == 1
+    assert first == second == [WORKED_REPLY]  # One reply each, in order.
+    view = snapshot(sim)
+    assert [e.direction for e in view.history] == [Direction.UPLINK, Direction.DOWNLINK]
+    assert view.state.commands_received == 1
+    assert view.goal.goal_reached  # The second connection really sent it.
+
+
+def test_receiver_cannot_stop_during_a_handoff(
+    sim: SimService, time: ManualTime
+) -> None:
+    attempts: list[type[Exception]] = []
+    later: list[bytes] = []
+
+    def stop_on_telemetry(downlink: Downlink) -> None:
+        try:
+            sim.stop(SESSION)
+        except Reentry:
+            attempts.append(Reentry)
+            raise
+
+    sim.attach_receiver(SESSION, stop_on_telemetry)
+    sim.attach_receiver(SESSION, sending(sim, later))
+    time.advance(2)
+
+    assert attempts == [Reentry, Reentry]
+    assert len(later) == 2
+    assert sim.read() is not None and time.pending_timers == 1
+    sim.stop(SESSION)
+    assert time.pending_timers == 0
+
+
+def test_receiver_detached_mid_handoff_gets_nothing(sim: SimService) -> None:
+    late: list[bytes] = []
+    ids: dict[str, str] = {}
+
+    def detach_the_other(downlink: Downlink) -> None:
+        sim.detach_receiver(ids["late"])
+
+    sim.attach_receiver(SESSION, detach_the_other)
+    ids["late"] = sim.attach_receiver(SESSION, sending(sim, late))
+    sim.send_packet(SESSION, WORKED_PING)
+    assert late == []
+    assert not snapshot(sim).goal.goal_reached
 
 
 def test_failed_start_leaves_no_session(time: ManualTime) -> None:

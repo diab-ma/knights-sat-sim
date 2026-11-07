@@ -1,14 +1,14 @@
 """Sim Service: the Python interface FastAPI calls for Hello sessions.
 
 Operations follow docs/specs/backend-and-simulation.md#operations-and-data.
-The Software Link is deterministic: ordered, synchronous delivery with no
+The Software Link is deterministic: ordered, synchronous handoff with no
 latency or drops. Every result handed out is an immutable copy.
 """
 
 import threading
 import uuid
 from collections.abc import Buffer, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 
@@ -32,8 +32,6 @@ READY = "ready-for-the-pass"
 CATCH = "catch-and-log"
 TELEMETRY_PERIOD_S = 1.0
 
-Receiver = Callable[[bytes], None]
-
 
 class SimError(Exception):
     pass
@@ -49,6 +47,10 @@ class NoSession(SimError):
 
 class UnsupportedChallenge(SimError):
     pass
+
+
+class Reentry(SimError):
+    """A receiver called back into the Sim while a packet was being handed off."""
 
 
 class Direction(StrEnum):
@@ -68,6 +70,21 @@ class PacketKind(StrEnum):
 
 
 @dataclass(frozen=True)
+class Downlink:
+    """A Satellite Sim packet handed to a receiver.
+
+    The receiver's transport passes ``delivery_id`` to
+    ``SimService.confirm_delivery`` once the packet has actually been sent.
+    """
+
+    delivery_id: str
+    packet: bytes
+
+
+Receiver = Callable[[Downlink], None]
+
+
+@dataclass(frozen=True)
 class Feedback:
     """A local Platform explanation, never a Satellite Sim reply."""
 
@@ -81,7 +98,8 @@ class HistoryEntry:
 
     ``submission_id`` is the uplink's own ID, or for a reply the submission it
     answers; telemetry has none. ``delivered`` means sent to the Link for an
-    uplink, and handed to at least one receiver for a downlink.
+    uplink. For a downlink it means a receiver confirmed sending it to a
+    script connection.
     """
 
     time: datetime
@@ -126,6 +144,13 @@ class SimSnapshot:
     goal: GoalEvidence
 
 
+@dataclass(frozen=True)
+class _PendingDelivery:
+    history_index: int
+    # The submission whose conforming PING this reply would complete.
+    goal_submission_id: str | None
+
+
 class _HelloSession:
     def __init__(self, session_id: str, now: float) -> None:
         self.session_id = session_id
@@ -133,6 +158,7 @@ class _HelloSession:
         self.downlink_sequence = SequenceCounter()
         self.history: list[HistoryEntry] = []
         self.receivers: dict[str, Receiver] = {}
+        self.pending: dict[str, _PendingDelivery] = {}
         self.next_telemetry_at = now + TELEMETRY_PERIOD_S
         self.timer: TimerHandle | None = None
         self.goal_submission_id: str | None = None
@@ -149,6 +175,7 @@ class SimService:
         self._scheduler = scheduler or AsyncioScheduler()
         self._lock = threading.RLock()
         self._session: _HelloSession | None = None
+        self._handing_off = False
 
     def start(self, session_id: str, challenge_id: str) -> SimSnapshot:
         """Create fresh simulation state. FastAPI checks unlocks first.
@@ -158,6 +185,7 @@ class SimService:
         telemetry timer is scheduled on the running loop.
         """
         with self._lock:
+            self._refuse_reentry()
             if self._session is not None:
                 raise SessionActive("A Sim session is already running")
             if challenge_id == READY:
@@ -173,8 +201,12 @@ class SimService:
             return self._snapshot(session)
 
     def stop(self, session_id: str) -> None:
-        """End timers and receivers. Repeated or stale stop is harmless."""
+        """End timers and receivers. Repeated or stale stop is harmless.
+
+        Deliveries still awaiting confirmation can no longer count.
+        """
         with self._lock:
+            self._refuse_reentry()
             session = self._session
             if session is None or session.session_id != session_id:
                 return
@@ -182,6 +214,7 @@ class SimService:
                 session.timer.cancel()
                 session.timer = None
             session.receivers.clear()
+            session.pending.clear()
             self._session = None
 
     def send_packet(self, session_id: str, packet_bytes: Buffer) -> SubmissionReceipt:
@@ -193,6 +226,7 @@ class SimService:
         """
         data = bytes(packet_bytes)
         with self._lock:
+            self._refuse_reentry()
             session = self._require(session_id)
             submission_id = str(uuid.uuid4())
 
@@ -218,14 +252,16 @@ class SimService:
     def attach_receiver(self, session_id: str, receiver: Receiver) -> str:
         """Register a downlink destination (the raw script connection).
 
-        The Link hands each Satellite Sim packet to every attached receiver.
-        Hello's goal needs its reply to reach at least one.
+        The Link hands each Satellite Sim packet, in order, to every attached
+        receiver. Receivers run while the Sim's lock is held, on the caller's
+        thread or the telemetry timer's event loop. A receiver must only
+        enqueue the packet (for example with ``put_nowait``) and raise if it
+        cannot. It must not call ``start``, ``stop`` or ``send_packet``;
+        those raise ``Reentry`` during a handoff.
 
-        Receivers run while the Sim's lock is held, on the caller's thread or
-        the telemetry timer's event loop. A receiver must not block (enqueue,
-        for example with ``put_nowait``) and must raise if it cannot accept the
-        packet: a call that returns normally counts as delivery, and Hello's
-        goal depends on that.
+        A handoff is not delivery. After the transport has actually sent the
+        packet to the script, it calls ``confirm_delivery``; Hello's goal
+        needs a confirmed reply.
         """
         with self._lock:
             session = self._require(session_id)
@@ -237,6 +273,35 @@ class SimService:
         with self._lock:
             if self._session is not None:
                 self._session.receivers.pop(receiver_id, None)
+
+    def confirm_delivery(self, session_id: str, delivery_id: str) -> bool:
+        """Record that a handed-off packet actually reached a script.
+
+        Returns whether this confirmation counted. Confirmations for a stopped
+        session, an unknown delivery or one already confirmed are ignored, so
+        a late send cannot affect a new session.
+        """
+        with self._lock:
+            session = self._session
+            if session is None or session.session_id != session_id:
+                return False
+            pending = session.pending.pop(delivery_id, None)
+            if pending is None:
+                return False
+            index = pending.history_index
+            session.history[index] = replace(session.history[index], delivered=True)
+            if (
+                pending.goal_submission_id is not None
+                and session.goal_submission_id is None
+            ):
+                session.goal_submission_id = pending.goal_submission_id
+            return True
+
+    def _refuse_reentry(self) -> None:
+        # The lock is re-entrant, so only a receiver on this thread can get
+        # here mid-handoff; nesting would reorder packets or outlive Stop.
+        if self._handing_off:
+            raise Reentry("Receivers must enqueue packets, not call back into the Sim")
 
     def _require(self, session_id: str) -> _HelloSession:
         session = self._session
@@ -257,17 +322,22 @@ class SimService:
             status=status,
             state=state,
         )
-        issue = ping_conformance_issue(command)
-        if status is Status.ACCEPTED and issue is not None:
-            session.goal_notes.append(GoalNote(submission_id, issue, issue.message))
-        delivered = self._downlink(session, reply, PacketKind.REPLY, submission_id)
-        if (
-            status is Status.ACCEPTED
-            and issue is None
-            and delivered
-            and session.goal_submission_id is None
-        ):
-            session.goal_submission_id = submission_id
+        conforming = False
+        if status is Status.ACCEPTED:
+            issue = ping_conformance_issue(command)
+            if issue is None:
+                conforming = True
+            else:
+                session.goal_notes.append(
+                    GoalNote(submission_id, issue, issue.message)
+                )
+        self._downlink(
+            session,
+            reply,
+            PacketKind.REPLY,
+            submission_id,
+            goal_submission_id=submission_id if conforming else None,
+        )
 
     def _schedule_telemetry(self, session: _HelloSession) -> None:
         delay = session.next_telemetry_at - self._clock.monotonic()
@@ -291,16 +361,9 @@ class SimService:
         packet: bytes,
         kind: PacketKind,
         submission_id: str | None,
-    ) -> bool:
-        delivered = False
-        for receiver in list(session.receivers.values()):
-            try:
-                receiver(packet)
-            except Exception:
-                # One broken connection must not stop delivery to the others
-                # or leave the command half-recorded.
-                continue
-            delivered = True
+        *,
+        goal_submission_id: str | None = None,
+    ) -> None:
         session.history.append(
             HistoryEntry(
                 time=self._clock.now(),
@@ -309,10 +372,32 @@ class SimService:
                 kind=kind,
                 packet=packet,
                 submission_id=submission_id,
-                delivered=delivered,
+                delivered=False,
             )
         )
-        return delivered
+        delivery_id = str(uuid.uuid4())
+        # Registered before the handoff so a receiver may confirm at once.
+        session.pending[delivery_id] = _PendingDelivery(
+            len(session.history) - 1, goal_submission_id
+        )
+        downlink = Downlink(delivery_id, packet)
+        handed_off = False
+        self._handing_off = True
+        try:
+            for receiver_id, receiver in list(session.receivers.items()):
+                if receiver_id not in session.receivers:
+                    continue  # Detached by an earlier receiver in this loop.
+                try:
+                    receiver(downlink)
+                except Exception:
+                    # One broken connection must not stop delivery to the
+                    # others or leave the command half-recorded.
+                    continue
+                handed_off = True
+        finally:
+            self._handing_off = False
+        if not handed_off:
+            session.pending.pop(delivery_id, None)
 
     def _record_uplink(
         self,
