@@ -1,5 +1,5 @@
-"""Sim Service package: Satellite Sim, Ground Sim, packet library, Software Link.
+"""Sim Service package: Satellite Sim, packet library, Software Link.
 
-Product behaviour is specified in docs/specs/.
-This package is empty until those tickets land.
+Product behaviour is specified in docs/specs/. ``sim.service.SimService`` is
+the interface FastAPI calls; ``sim.packet`` owns the Packet v1 bytes.
 """

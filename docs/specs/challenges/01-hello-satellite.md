@@ -2,7 +2,7 @@
 
 ## Read this for the first activity
 
-Hello connects a supplied PING script to the real simulation and saved completion. Start with `player/python/kss_client.py`, the Sim/Link (KSAT-10), the browser terminal, the session start/read/stop routes and the progress module. The complete activity does not exist yet.
+Hello connects a supplied PING script to the real simulation and saved completion. Start with `player/python/kss_client.py`, the Sim/Link (`server/sim/service.py`, built in KSAT-10), the browser terminal, the session start/read/stop routes and the progress module. The complete activity does not exist yet.
 
 Read the learner walkthrough first, then [exact goal](#setup-defenses-and-exact-goal) and [acceptance examples](#acceptance-examples). Sending, receiving a reply, verifying the task, and saving completion are four separate events. The UI must tell the learner which actually happened.
 
