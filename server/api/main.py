@@ -1,10 +1,22 @@
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.challenges import list_challenges
+from api.progress import migrate, read_completed
 from api.schemas import ChallengeList, Progress
 
-app = FastAPI(title="Satellite Security Challenge Platform")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    await asyncio.to_thread(migrate)
+    yield
+
+
+app = FastAPI(title="Satellite Security Challenge Platform", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,7 +33,8 @@ def health() -> dict[str, str]:
 
 @app.get("/api/challenges", response_model=ChallengeList)
 def get_challenges() -> ChallengeList:
+    completed_ids = read_completed()
     return ChallengeList(
-        challenges=list_challenges(set()),
-        progress=Progress(completed_challenge_ids=[]),
+        challenges=list_challenges(completed_ids),
+        progress=Progress(completed_challenge_ids=sorted(completed_ids)),
     )

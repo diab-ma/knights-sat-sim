@@ -32,7 +32,8 @@ def test_challenge_progression(
 
 
 def test_challenge_endpoint() -> None:
-    response = TestClient(app).get("/api/challenges")
+    with TestClient(app) as client:
+        response = client.get("/api/challenges")
     assert response.status_code == 200
     assert response.json() == {
         "challenges": [
@@ -64,7 +65,8 @@ def test_challenge_endpoint() -> None:
 
 def test_dev_unlock_all(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEV_UNLOCK_ALL", "1")
-    response = TestClient(app).get("/api/challenges")
+    with TestClient(app) as client:
+        response = client.get("/api/challenges")
     assert response.status_code == 200
     data = response.json()
     assert len(data["challenges"]) == 3
