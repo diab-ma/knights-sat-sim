@@ -34,12 +34,9 @@ from sim.service import (
 )
 from sim.state import Mode, SatelliteState
 
-WORKED_PING = bytes.fromhex("1001c0000005" "01000000" "c03e")
+WORKED_PING = bytes.fromhex("1001c000000501000000c03e")
 WORKED_REPLY = bytes.fromhex(
-    "0002c0000018"
-    "1101000000"
-    "000000000000006400000000000000010000"
-    "e136"
+    "0002c00000181101000000000000000000006400000000000000010000e136"
 )
 SESSION = "session-1"
 
@@ -159,6 +156,14 @@ def test_truncation_does_not_consume_a_downlink_sequence(
     sim.send_packet(SESSION, WORKED_PING[:9])
     sim.send_packet(SESSION, WORKED_PING)
     assert received == [WORKED_REPLY]  # downlink sequence still zero
+
+
+def test_receipt_carries_local_feedback_without_implying_command_acceptance(sim):
+    receipt = sim.send_packet(SESSION, b"\x00")
+    assert receipt.sent_to_link and receipt.refusal is None
+    assert receipt.feedback is not None
+    assert receipt.feedback.code == "TRUNCATED_HEADER"
+    assert snapshot(sim).state.commands_received == 0
 
 
 def test_oversized_packet_is_refused_before_the_link(
@@ -296,8 +301,12 @@ def test_receipts_replies_and_feedback_are_distinct(
         "submission_id",
         "sent_to_link",
         "refusal",
+        "feedback",
     }
     assert unreadable.sent_to_link and unreadable.refusal is None
+    assert unreadable.feedback is not None
+    assert unreadable.feedback.code == "TRUNCATED_BODY"
+    assert accepted.feedback is None
     assert accepted.submission_id != unreadable.submission_id
 
     history = snapshot(sim).history
@@ -494,13 +503,38 @@ def test_read_returns_copies(sim: SimService, received: list[bytes]) -> None:
 
 def test_start_refusals(time: ManualTime) -> None:
     sim = SimService(clock=time, scheduler=time)
-    for challenge in (READY, CATCH, "unknown"):
+    for challenge in (READY, "unknown"):
         with pytest.raises(UnsupportedChallenge):
             sim.start(SESSION, challenge)
     assert sim.read() is None and time.pending_timers == 0
     sim.start(SESSION, HELLO)
     with pytest.raises(SessionActive):
         sim.start("session-2", HELLO)
+
+
+def test_catch_starts_fresh_receive_only_state_without_live_telemetry(time):
+    sim = SimService(clock=time, scheduler=time)
+    first = sim.start(SESSION, CATCH)
+    assert first.challenge_id == CATCH and first.pass_view is not None
+    assert first.pass_view.status == "not_started"
+    assert not first.pass_view.receiver_ready
+    expected = SatelliteState(
+        mode=Mode.NOMINAL,
+        antenna_deployed=True,
+        deploy_count=1,
+        battery_pct=80,
+        uptime_s=600,
+    )
+    assert first.state == expected
+    assert time.pending_timers == 0
+    time.advance(30)
+    assert sim.read().history == ()
+    assert sim.read().state == expected
+    with pytest.raises(UnsupportedChallenge, match="receive-only"):
+        sim.send_packet(SESSION, WORKED_PING)
+    sim.stop(SESSION)
+    second = sim.start("session-2", CATCH)
+    assert second.pass_view.pass_run_id != first.pass_view.pass_run_id
 
 
 def test_send_requires_the_running_session(time: ManualTime) -> None:
