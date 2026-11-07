@@ -4,7 +4,7 @@
 
 The **Backend** receives browser requests. The **Sim Service** runs the fictional satellite. They share one Python process but have different jobs. The Backend must not directly change the Sim's internal objects.
 
-Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Add simulation work under `server/sim/`, which is currently a placeholder.
+Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Simulation work lives under `server/sim/`: KSAT-10 built the packet library and `sim.service.SimService`, the Python interface below. No route calls it yet.
 
 | You are building | Read first |
 | --- | --- |
