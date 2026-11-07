@@ -564,6 +564,40 @@ def test_reply_lost_before_sending_never_solves(sim: SimService) -> None:
     sim.detach_receiver(receiver_id)
     assert not snapshot(sim).goal.goal_reached
     assert [entry.delivered for entry in snapshot(sim).history] == [True, False]
+    # Abandoned with its connection: nothing is left waiting for it.
+    [reply] = queue
+    assert not sim.confirm_delivery(SESSION, reply.delivery_id)
+
+
+def test_abandoned_handoffs_do_not_accumulate(
+    sim: SimService, time: ManualTime
+) -> None:
+    def broken(downlink: Downlink) -> None:
+        raise ConnectionError
+
+    sim.attach_receiver(SESSION, broken)
+    for _ in range(3):
+        queue: list[Downlink] = []
+        receiver_id = sim.attach_receiver(SESSION, queueing(queue))
+        sim.send_packet(SESSION, WORKED_PING)
+        time.advance(1)
+        sim.detach_receiver(receiver_id)
+    assert sim._session is not None
+    assert sim._session.pending == {}
+
+
+def test_packet_held_by_two_connections_survives_one_leaving(
+    sim: SimService,
+) -> None:
+    first: list[Downlink] = []
+    second: list[Downlink] = []
+    first_id = sim.attach_receiver(SESSION, queueing(first))
+    sim.attach_receiver(SESSION, queueing(second))
+    sim.send_packet(SESSION, WORKED_PING)
+    sim.detach_receiver(first_id)
+    [reply] = second
+    assert sim.confirm_delivery(SESSION, reply.delivery_id)
+    assert snapshot(sim).goal.goal_reached
 
 
 def test_stale_unknown_and_repeated_confirmations_are_ignored(

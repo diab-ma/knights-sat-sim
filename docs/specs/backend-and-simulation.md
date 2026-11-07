@@ -119,8 +119,9 @@ The Sim Service exposes these Python operations to FastAPI:
 | `send_packet` | `session_id`, original `packet_bytes` from the raw script route | Record and deliver the bytes through the Link; return a receipt, not proof of acceptance. Preserve malformed bytes. Hello only; Catch refuses uplinks. Never retry automatically. Refuses bytes for a session that is no longer running. |
 | `start_pass` | — | Start the 12-packet Catch pass once; return the current pass if already started. Requires a connected receiver. |
 | `read` | — | A copy of current spacecraft state, packet history, pass status and goal evidence. |
-| `attach_receiver` / `detach_receiver` | `session_id` and a receiver / receiver ID | Register or remove a script connection for downlinks. The Link hands each packet, in order, to every receiver. A receiver only enqueues; it never calls back into the Sim. |
-| `confirm_delivery` | `session_id`, `delivery_id` | Called after the connection has actually sent a handed-off packet. A queued packet is not a delivered one. Hello's goal needs a confirmed reply. Confirmations for a stopped session are ignored. |
+| `attach_receiver` | `session_id`, receiver | Register a script connection for downlinks and return its receiver ID. The Link hands each packet, in order, to every receiver as `Downlink(delivery_id, packet)`. A receiver only enqueues the packet, or raises if it cannot. During that handoff, `start`, `stop` and `send_packet` raise `Reentry`. |
+| `detach_receiver` | receiver ID | Remove a connection, for example on disconnect. Packets it held but never confirmed are abandoned. |
+| `confirm_delivery` | `session_id`, `delivery_id` | Called after the connection has actually sent a handed-off packet. A queued packet is not a delivered one. Hello's goal needs a confirmed reply. Confirmations for a stopped session, an abandoned packet or one already confirmed are ignored. |
 
 Return copies, not mutable service objects. Station setup and file checks are FastAPI's job; they are not part of spacecraft state.
 

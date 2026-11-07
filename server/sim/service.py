@@ -144,11 +144,13 @@ class SimSnapshot:
     goal: GoalEvidence
 
 
-@dataclass(frozen=True)
+@dataclass
 class _PendingDelivery:
     history_index: int
     # The submission whose conforming PING this reply would complete.
     goal_submission_id: str | None
+    # Receivers holding the packet that could still confirm it.
+    receiver_ids: set[str]
 
 
 class _HelloSession:
@@ -261,7 +263,8 @@ class SimService:
 
         A handoff is not delivery. After the transport has actually sent the
         packet to the script, it calls ``confirm_delivery``; Hello's goal
-        needs a confirmed reply.
+        needs a confirmed reply. When the connection closes or a send fails,
+        call ``detach_receiver`` so its unsent packets are abandoned.
         """
         with self._lock:
             session = self._require(session_id)
@@ -270,9 +273,20 @@ class SimService:
             return receiver_id
 
     def detach_receiver(self, receiver_id: str) -> None:
+        """Remove a script connection, for example when it disconnects.
+
+        Packets it held but never confirmed are abandoned; once no receiver
+        holds a packet, it can no longer be confirmed.
+        """
         with self._lock:
-            if self._session is not None:
-                self._session.receivers.pop(receiver_id, None)
+            session = self._session
+            if session is None:
+                return
+            session.receivers.pop(receiver_id, None)
+            for delivery_id, pending in list(session.pending.items()):
+                pending.receiver_ids.discard(receiver_id)
+                if not pending.receiver_ids:
+                    del session.pending[delivery_id]
 
     def confirm_delivery(self, session_id: str, delivery_id: str) -> bool:
         """Record that a handed-off packet actually reached a script.
@@ -377,11 +391,11 @@ class SimService:
         )
         delivery_id = str(uuid.uuid4())
         # Registered before the handoff so a receiver may confirm at once.
-        session.pending[delivery_id] = _PendingDelivery(
-            len(session.history) - 1, goal_submission_id
+        pending = _PendingDelivery(
+            len(session.history) - 1, goal_submission_id, set(session.receivers)
         )
+        session.pending[delivery_id] = pending
         downlink = Downlink(delivery_id, packet)
-        handed_off = False
         self._handing_off = True
         try:
             for receiver_id, receiver in list(session.receivers.items()):
@@ -392,11 +406,10 @@ class SimService:
                 except Exception:
                     # One broken connection must not stop delivery to the
                     # others or leave the command half-recorded.
-                    continue
-                handed_off = True
+                    pending.receiver_ids.discard(receiver_id)
         finally:
             self._handing_off = False
-        if not handed_off:
+        if not pending.receiver_ids:
             session.pending.pop(delivery_id, None)
 
     def _record_uplink(
