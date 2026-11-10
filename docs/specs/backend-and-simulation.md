@@ -4,7 +4,7 @@
 
 The **Backend** receives browser requests. The **Sim Service** runs the fictional satellite. They share one Python process but have different jobs. The Backend must not directly change the Sim's internal objects.
 
-Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Add simulation work under `server/sim/`, which is currently a placeholder.
+Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Simulation work lives under `server/sim/`: KSAT-10 built the packet library and `sim.service.SimService`, the Python interface below. No route calls it yet.
 
 | You are building | Read first |
 | --- | --- |
@@ -116,9 +116,12 @@ The Sim Service exposes these Python operations to FastAPI:
 | --- | --- | --- |
 | `start` | `session_id`, `challenge_id` | Create fresh Hello or Catch simulation state. FastAPI checks unlocks first. |
 | `stop` | `session_id` | End timers and streams. Repeated stop is harmless. |
-| `send_packet` | original `packet_bytes` from the raw script route | Record and deliver the bytes through the Link; return a receipt, not proof of acceptance. Preserve malformed bytes. Hello only; Catch refuses uplinks. Never retry automatically. |
+| `send_packet` | `session_id`, original `packet_bytes` from the raw script route | Record and deliver the bytes through the Link; return a receipt, not proof of acceptance. Preserve malformed bytes. Hello only; Catch refuses uplinks. Never retry automatically. Refuses bytes for a session that is no longer running. |
 | `start_pass` | — | Start the 12-packet Catch pass once; return the current pass if already started. Requires a connected receiver. |
 | `read` | — | A copy of current spacecraft state, packet history, pass status and goal evidence. |
+| `attach_receiver` | `session_id`, receiver | Register a script connection for downlinks and return its receiver ID. The Link hands each packet, in order, to every receiver as `Downlink(delivery_id, packet)`. A receiver only enqueues the packet, or raises if it cannot. During that handoff, `start`, `stop` and `send_packet` raise `Reentry`. |
+| `detach_receiver` | receiver ID | Remove a connection, for example on disconnect. Packets it held but never confirmed are abandoned. |
+| `confirm_delivery` | `session_id`, `delivery_id` | Called after the connection has actually sent a handed-off packet. A queued packet is not a delivered one. Hello's goal needs a confirmed reply. Confirmations for a stopped session, an abandoned packet or one already confirmed are ignored. |
 
 Return copies, not mutable service objects. Station setup and file checks are FastAPI's job; they are not part of spacecraft state.
 
