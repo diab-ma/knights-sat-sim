@@ -69,3 +69,7 @@ class Session(BaseModel):
     goal_reached: bool
     completion: Literal["not_yet", "saved", "save_failed"]
     checks: list[Check]
+
+
+class SessionResponse(BaseModel):
+    session: Session | None
