@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.challenges import list_challenges
 from api.dev_echo import router as dev_echo_router
 from api.progress import migrate, read_completed
+from api.ready import router as ready_router
 from api.schemas import ChallengeList, Progress
 
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Satellite Security Challenge Platform", lifespan=lifespan)
+app.include_router(ready_router)
 
 app.include_router(dev_echo_router)
 
