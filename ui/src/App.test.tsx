@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import ComponentExamples from "./ComponentExamples";
 
 vi.mock("./features/terminal/TerminalPanel", () => ({
   default: () => <div data-testid="terminal-panel-mock">Terminal panel</div>,
@@ -82,8 +83,7 @@ describe("workstation", () => {
   });
 
   it("demonstrates persistent field errors and explicit confirmation in development", async () => {
-    window.history.replaceState(null, "", "/dev/components");
-    render(<App />);
+    render(<ComponentExamples />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Submit example" }),
     );

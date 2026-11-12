@@ -12,6 +12,19 @@ const terminalMock = vi.hoisted(() => ({
   fit: vi.fn(),
 }));
 
+const socketMock = vi.hoisted(() => ({
+  instances: [] as Array<{
+    url: string;
+    readyState: number;
+    binaryType: string;
+    onmessage: ((event: MessageEvent) => void) | null;
+    onerror: ((event: Event) => void) | null;
+    onclose: ((event: CloseEvent) => void) | null;
+    send: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+  }>,
+}));
+
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
     constructor(options: Record<string, unknown>) {
@@ -48,16 +61,40 @@ vi.mock("@xterm/addon-fit", () => ({
   },
 }));
 
-afterEach(cleanup);
+class MockWebSocket {
+  static readonly OPEN = 1;
+
+  readyState = 0;
+  binaryType = "blob";
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  send = vi.fn();
+  close = vi.fn(() => {
+    this.readyState = 3;
+    this.onclose?.({} as CloseEvent);
+  });
+
+  constructor(readonly url: string) {
+    socketMock.instances.push(this);
+  }
+}
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
   terminalMock.options = undefined;
   terminalMock.inputHandler = undefined;
+  socketMock.instances = [];
+  vi.stubGlobal("WebSocket", MockWebSocket);
 });
 
 describe("TerminalPanel", () => {
-  it("starts xterm in local-echo mode with links and clipboard disabled", () => {
+  it("starts xterm and opens the echo socket", () => {
     render(<TerminalPanel />);
 
     expect(screen.getByRole("region", { name: "Terminal" })).toBeInTheDocument();
@@ -69,7 +106,11 @@ describe("TerminalPanel", () => {
     expect(terminalMock.writeln).toHaveBeenCalledWith(
       "Hello from the terminal panel",
     );
-    expect(terminalMock.write).toHaveBeenCalledWith("$ ");
+    expect(socketMock.instances).toHaveLength(1);
+    expect(socketMock.instances[0]).toMatchObject({
+      url: "ws://localhost:8000/api/dev/echo",
+      binaryType: "arraybuffer",
+    });
 
     const terminal = screen.getByRole("region", { name: "Terminal" });
     const xtermHost = terminal.firstElementChild;
@@ -77,14 +118,16 @@ describe("TerminalPanel", () => {
     for (const type of ["copy", "cut", "paste"]) {
       const event = new Event(type, { bubbles: true, cancelable: true });
       xtermHost?.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
     }
   });
 
-  it("echoes typed input, handles Enter and Backspace, then disposes xterm", () => {
+  it("sends input through the socket and writes server echoes", () => {
     const { unmount } = render(<TerminalPanel />);
     const input = terminalMock.inputHandler;
+    const socket = socketMock.instances[0];
     expect(input).toBeDefined();
+    socket.readyState = MockWebSocket.OPEN;
     terminalMock.write.mockClear();
 
     input?.("h");
@@ -93,16 +136,47 @@ describe("TerminalPanel", () => {
     input?.("i");
     input?.("\r");
 
-    expect(terminalMock.write.mock.calls).toEqual([
+    expect(socket.send.mock.calls).toEqual([
       ["h"],
       ["e"],
-      ["\b \b"],
+      ["\u007f"],
       ["i"],
-      ["\r\n$ "],
+      ["\r"],
+    ]);
+    for (const echoed of ["h", "e", "\u007f", "i", "\r"]) {
+      const data = new ArrayBuffer(1);
+      new Uint8Array(data)[0] = echoed.charCodeAt(0);
+      socket.onmessage?.({ data } as MessageEvent);
+    }
+
+    expect(terminalMock.write.mock.calls).toEqual([
+      [new Uint8Array([104])],
+      [new Uint8Array([101])],
+      [new Uint8Array([127])],
+      [new Uint8Array([105])],
+      [new Uint8Array([13])],
     ]);
 
     unmount();
     expect(terminalMock.disposeInput).toHaveBeenCalledOnce();
     expect(terminalMock.dispose).toHaveBeenCalledOnce();
+    expect(socket.close).toHaveBeenCalledOnce();
+  });
+
+  it("reports a failed or closed connection only once", () => {
+    render(<TerminalPanel />);
+    const socket = socketMock.instances[0];
+
+    socket.onerror?.(new Event("error"));
+    socket.onclose?.({} as CloseEvent);
+
+    expect(terminalMock.writeln).toHaveBeenCalledWith(
+      "Not connected to the server",
+    );
+    expect(
+      terminalMock.writeln.mock.calls.filter(
+        ([message]) => message === "Not connected to the server",
+      ),
+    ).toHaveLength(1);
   });
 });

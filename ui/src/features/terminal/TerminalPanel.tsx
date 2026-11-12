@@ -21,33 +21,29 @@ export default function TerminalPanel() {
     fitAddon.fit();
 
     terminal.writeln("Hello from the terminal panel");
-    terminal.write("$ ");
-
-    let currentLineLength = 0;
-    const input = terminal.onData((data) => {
-      if (data === "\r" || data === "\n") {
-        terminal.write("\r\n$ ");
-        currentLineLength = 0;
-      } else if (data === "\u007f" || data === "\b") {
-        if (currentLineLength > 0) {
-          terminal.write("\b \b");
-          currentLineLength -= 1;
-        }
-      } else if (data === "\u0003") {
-        terminal.write("^C\r\n$ ");
-        currentLineLength = 0;
-      } else {
-        terminal.write(data);
-        currentLineLength += [...data].length;
-      }
-    });
-
-    const preventClipboardAccess = (event: ClipboardEvent) => {
-      event.preventDefault();
+    const socket = new WebSocket("ws://localhost:8000/api/dev/echo");
+    socket.binaryType = "arraybuffer";
+    let disposed = false;
+    let connectionMessageWritten = false;
+    const reportDisconnected = () => {
+      if (disposed || connectionMessageWritten) return;
+      connectionMessageWritten = true;
+      terminal.writeln("Not connected to the server");
     };
-    container.addEventListener("copy", preventClipboardAccess, true);
-    container.addEventListener("cut", preventClipboardAccess, true);
-    container.addEventListener("paste", preventClipboardAccess, true);
+
+    socket.onmessage = ({ data }) => {
+      if (typeof data === "string") {
+        terminal.write(data);
+      } else if (data instanceof ArrayBuffer) {
+        terminal.write(new Uint8Array(data));
+      }
+    };
+    socket.onerror = reportDisconnected;
+    socket.onclose = reportDisconnected;
+
+    const input = terminal.onData((data) => {
+      if (socket.readyState === WebSocket.OPEN) socket.send(data);
+    });
 
     const resizeObserver =
       typeof ResizeObserver === "undefined"
@@ -59,13 +55,15 @@ export default function TerminalPanel() {
     const fitFrame = window.requestAnimationFrame(fitTerminal);
 
     return () => {
+      disposed = true;
       input.dispose();
       resizeObserver?.disconnect();
       window.removeEventListener("resize", fitTerminal);
       window.cancelAnimationFrame(fitFrame);
-      container.removeEventListener("copy", preventClipboardAccess, true);
-      container.removeEventListener("cut", preventClipboardAccess, true);
-      container.removeEventListener("paste", preventClipboardAccess, true);
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      socket.close();
       terminal.dispose();
     };
   }, []);
