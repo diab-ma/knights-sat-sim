@@ -4,7 +4,11 @@
 
 The **Backend** receives browser requests. The **Sim Service** runs the fictional satellite. They share one Python process but have different jobs. The Backend must not directly change the Sim's internal objects.
 
-Start in `server/api/main.py` (currently health only). Reuse `server/api/runtime.py` and `server/api/script_bridge.py`; those infrastructure pieces exist. Simulation work lives under `server/sim/`: KSAT-10 built the packet library and `sim.service.SimService`, the Python interface below. No route calls it yet.
+Start in `server/api/main.py`. The Python session engine is `api.session.SessionService`;
+reuse it rather than duplicating lifecycle handling in routes. It connects
+`api.runtime.RuntimeController`, `api.script_bridge.ScriptBridge` and
+`sim.service.SimService`. HTTP session routes are separate work (KSAT-62/63), and
+no public route calls the engine yet.
 
 | You are building | Read first |
 | --- | --- |
@@ -125,6 +129,11 @@ The Sim Service exposes these Python operations to FastAPI:
 
 Return copies, not mutable service objects. Station setup and file checks are FastAPI's job; they are not part of spacecraft state.
 
+`SubmissionReceipt.refusal` explains a before-Link refusal; `feedback` carries
+local parsing feedback for bytes that did reach the Link. Both are Platform
+explanations, not Satellite acceptance or replies. Script adapters send that
+feedback directly without reconstructing it from packet history.
+
 ## Task completion
 
 The [Hello goal](challenges/01-hello-satellite.md#setup-defenses-and-exact-goal) and [operations evidence](ground-station-training.md#implementation-defaults-practice-pass-and-evidence) define success. Hello needs an accepted conforming Player PING and its correlated reply actually received through the Link. Ready needs a check of submitted settings in which every field passes. Catch needs a finished pass, a matching saved recording and a factual saved log. An HTTP receipt, browser checkbox or terminal success text is never enough.
@@ -169,6 +178,47 @@ Restarting or switching Challenges is Stop followed by Start. A new session gets
 If the server process crashes or restarts, the unfinished session ends; saved completion remains. At startup, before reporting healthy, remove any leftover Player container and bridge belonging to this deployment ([controller handoff](terminal-workspace.md#controller-integration-handoff)). Connection loss never triggers an automatic packet resend, because retransmission can change the Challenge outcome.
 
 Idle expiry, reopening only the terminal, and resetting the Workspace are [later hardening](later-hardening.md#lifecycle-extras).
+
+### Python session-engine handoff
+
+Construct one `SessionService(controller, bridge, sim, files)` per server process.
+`files` maps each supported Challenge ID to `ChallengeFiles(starters, resources)`:
+plain filenames and bytes from that Challenge's implementation. The engine adds
+fresh `connection.json` itself and owns Catch's prepared `pass-brief.json` and
+`log-template.json`; callers cannot override these with stale credentials/context.
+Hello's PING example/helper belongs to KSAT-17; Catch's learner starter and finite
+pass delivery belong to KSAT-20. Runtime tests use explicitly labelled asset
+fixtures, not evidence of those learner deliverables.
+
+- `await start(challenge_id)` checks saved unlocks, reserves the one shared slot,
+  and returns a `Session`. Ready has no session. A partial/cancelled start retains
+  a failed slot until explicit Stop succeeds.
+- `read()` returns an independent `Session` or `None`; it never saves completion.
+  Serialize with Pydantic aliases (`model_dump(mode="json", by_alias=True)`) so
+  Python's `pass_view` appears as the browser field `pass`. Views have no secret.
+- `await stop()` revokes access, stops the Sim/listener, then destroys execution
+  with `clear_workspace=False`. Repeated Stop is safe. Never free a failed slot
+  or start another session while cleanup is unconfirmed.
+- `await save_completion(session_id)` saves already-verified Sim goal evidence
+  under the same lifecycle lock. The Hello completion trigger belongs to KSAT-65;
+  merely reading or starting a session does not trigger it. Catch evidence checks
+  belong to KSAT-22. Storage failure preserves goal evidence, reports
+  `STORAGE_UNAVAILABLE`, and exposes `completion: save_failed`. Cancellation waits
+  for the DB worker to settle before releasing the lock.
+
+`SessionFailure.code` carries admission/evidence/storage errors;
+`RuntimeFailure.code` carries runtime/cleanup failures. HTTP adapters translate
+these into the status and envelope below. `service.lock` is the single shared
+lock for other completion writers and reset guards; do not wrap engine methods
+in that non-reentrant lock. File/terminal adapters can use `service.controller`
+under the same lifecycle coordination. The shared Workspace ID is fixed by the
+engine, never taken from a browser request.
+
+Catch's initial Sim snapshot has a fresh `pass_run_id`, no history, status
+`not_started`, and no Hello telemetry timer. Its idle receive handler registers
+one receiver and rejects uplinks. The actual 12-packet pass is KSAT-20, not an
+acceptance claim of this engine slice. Startup reconciliation/readiness remains
+KSAT-37; packaging the engine into the app remains KSAT-23.
 
 ## Script access
 
