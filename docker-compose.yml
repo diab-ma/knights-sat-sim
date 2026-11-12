@@ -34,6 +34,7 @@ services:
       - "127.0.0.1:5173:5173"
     environment:
       VITE_API_URL: http://localhost:8000
+      API_PROXY_TARGET: http://server:8000
     volumes:
       - ./ui:/app
       - ui-node-modules:/app/node_modules

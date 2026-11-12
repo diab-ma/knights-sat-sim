@@ -16,6 +16,19 @@ class Progress(BaseModel):
     completed_challenge_ids: list[str]
 
 
+class ResetProgressRequest(BaseModel):
+    confirm: Literal["RESET DEMO PROGRESS"]
+
+
+class ApiError(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ApiError
+
+
 class ChallengeList(BaseModel):
     challenges: list[Challenge]
     progress: Progress
