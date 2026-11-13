@@ -5,8 +5,13 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import ComponentExamples from "./ComponentExamples";
+
+vi.mock("./features/terminal/TerminalPanel", () => ({
+  default: () => <div data-testid="terminal-panel-mock">Terminal panel</div>,
+}));
 
 afterEach(cleanup);
 
@@ -22,7 +27,12 @@ describe("workstation", () => {
       }),
     ).toBeInTheDocument();
     const workspace = screen.getByRole("region", { name: "Workspace pane" });
+    expect(workspace).not.toHaveTextContent("Terminal not connected");
+    expect(workspace).not.toHaveTextContent(
+      "No terminal session is running. Terminal access will be available once a session starts.",
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
+    expect(screen.getByTestId("terminal-panel-mock")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: /Ready for the Pass/ }));
     expect(
       await screen.findByRole("heading", {
@@ -73,8 +83,7 @@ describe("workstation", () => {
   });
 
   it("demonstrates persistent field errors and explicit confirmation in development", async () => {
-    window.history.replaceState(null, "", "/dev/components");
-    render(<App />);
+    render(<ComponentExamples />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Submit example" }),
     );
