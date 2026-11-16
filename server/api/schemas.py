@@ -84,6 +84,10 @@ class Session(BaseModel):
     checks: list[Check]
 
 
+class SessionResponse(BaseModel):
+    session: Session | None
+
+
 class StationSetup(BaseModel):
     model_config = ConfigDict(strict=True)
 
