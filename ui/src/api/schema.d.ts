@@ -1,5 +1,10 @@
-// Generated from FastAPI app.openapi() components.schemas for KSAT-62.
+// Generated from FastAPI app.openapi() components.schemas.
 // Edit server/api/schemas.py and regenerate when the API changes.
+
+export interface ApiError {
+  code: string;
+  message: string;
+}
 
 export interface Challenge {
   challenge_id: string;
@@ -12,6 +17,18 @@ export interface Challenge {
 export interface ChallengeList {
   challenges: (Challenge)[];
   progress: Progress;
+}
+
+export interface ErrorResponse {
+  error: ApiError;
+}
+
+export interface Progress {
+  completed_challenge_ids: (string)[];
+}
+
+export interface ResetProgressRequest {
+  confirm: "RESET DEMO PROGRESS";
 }
 
 export interface Check {
@@ -39,10 +56,6 @@ export interface PassView {
   status: "not_started" | "running" | "finished" | "interrupted";
   receiver_ready: boolean;
   received_count: number;
-}
-
-export interface Progress {
-  completed_challenge_ids: (string)[];
 }
 
 export interface Session {
