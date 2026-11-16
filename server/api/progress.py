@@ -59,3 +59,10 @@ def save_completion(challenge_id: str) -> None:
             "VALUES (?, ?) ON CONFLICT (challenge_id) DO NOTHING",
             (challenge_id, datetime.now(UTC).isoformat()),
         )
+
+
+def reset_completion() -> None:
+    """Clear shared completion atomically, preserving migrations and other data."""
+    with closing(connect()) as connection, connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("DELETE FROM challenge_completion")
