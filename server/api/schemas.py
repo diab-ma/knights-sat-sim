@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Challenge(BaseModel):
@@ -86,3 +86,24 @@ class Session(BaseModel):
 
 class SessionResponse(BaseModel):
     session: Session | None
+
+
+class StationSetup(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    satellite_id: str
+    pass_start_utc: str
+    receive_frequency_hz: int = Field(gt=0)
+    receive_mode: str
+    tracking_enabled: bool
+
+
+class ReadyBrief(BaseModel):
+    scenario_id: str
+    brief: StationSetup
+    starting_setup: StationSetup
+
+
+class ReadyCheck(BaseModel):
+    checks: list[Check]
+    completion: Literal["not_yet", "saved", "save_failed"]

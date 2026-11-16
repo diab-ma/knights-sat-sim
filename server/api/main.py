@@ -9,6 +9,7 @@ from api.challenges import list_challenges
 from api.dev_echo import router as dev_echo_router
 from api.progress import migrate, read_completed
 from api.progress_routes import router as progress_router
+from api.ready import router as ready_router
 from api.schemas import ChallengeList, Progress, SessionResponse
 from api.session import SessionService
 
@@ -24,6 +25,7 @@ app = FastAPI(title="Satellite Security Challenge Platform", lifespan=lifespan)
 
 app.include_router(dev_echo_router)
 app.include_router(progress_router)
+app.include_router(ready_router)
 
 app.add_middleware(
     CORSMiddleware,

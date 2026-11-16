@@ -84,3 +84,35 @@ export interface StateView {
   commands_received: number;
   last_seq_seen: number | null;
 }
+
+
+export interface ReadyBrief {
+  scenario_id: string;
+  brief: StationSetup;
+  starting_setup: StationSetup;
+}
+
+export interface ReadyCheck {
+  checks: (Check)[];
+  completion: "not_yet" | "saved" | "save_failed";
+}
+
+export interface StationSetup {
+  satellite_id: string;
+  pass_start_utc: string;
+  receive_frequency_hz: number;
+  receive_mode: string;
+  tracking_enabled: boolean;
+}
+
+export interface HTTPValidationError {
+  detail?: (ValidationError)[];
+}
+
+export interface ValidationError {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+  input?: unknown;
+  ctx?: Record<string, unknown>;
+}
