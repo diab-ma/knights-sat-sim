@@ -10,6 +10,7 @@ from api.dev_echo import router as dev_echo_router
 from api.progress import migrate, read_completed
 from api.progress_routes import router as progress_router
 from api.schemas import ChallengeList, Progress
+from api.session_routes import router as session_router
 
 
 @asynccontextmanager
@@ -23,6 +24,7 @@ app = FastAPI(title="Satellite Security Challenge Platform", lifespan=lifespan)
 
 app.include_router(dev_echo_router)
 app.include_router(progress_router)
+app.include_router(session_router)
 
 app.add_middleware(
     CORSMiddleware,
