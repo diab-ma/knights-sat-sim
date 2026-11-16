@@ -78,7 +78,7 @@ From a fresh terminal in the repository, check the server:
 cd server
 uv sync --extra dev
 uv run ruff check .
-uv run mypy --ignore-missing-imports api
+uv run mypy --ignore-missing-imports api sim
 uv run pytest
 ```
 

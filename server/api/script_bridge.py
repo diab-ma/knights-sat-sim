@@ -132,8 +132,14 @@ class ScriptBridge:
         if self._server is not None:
             self._server.should_exit = True
         if self._task is not None:
-            await asyncio.wait_for(self._task, timeout=3)
-            self._task = None
+            task = self._task
+            try:
+                # Cancellation/timeout of Stop must not cancel the listener's
+                # shutdown task and permanently poison all cleanup retries.
+                await asyncio.wait_for(asyncio.shield(task), timeout=3)
+            finally:
+                if task.done():
+                    self._task = None
         if self._socket is not None:
             self._socket.close()
             self._socket = None

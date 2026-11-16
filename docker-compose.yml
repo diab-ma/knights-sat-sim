@@ -34,6 +34,7 @@ services:
       - "127.0.0.1:5173:5173"
     environment:
       VITE_API_URL: http://localhost:8000
+      API_PROXY_TARGET: http://server:8000
     volumes:
       - ./ui:/app
       - ui-node-modules:/app/node_modules
@@ -53,7 +54,7 @@ services:
     build: ./server
     cpus: 1.5
     mem_limit: 2g
-    command: [sh, -ec, "ruff check .; mypy --ignore-missing-imports api; pytest"]
+    command: [sh, -ec, "ruff check .; mypy --ignore-missing-imports api sim; pytest"]
   ui-check:
     profiles: [checks]
     build: ./ui

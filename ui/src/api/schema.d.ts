@@ -1,5 +1,9 @@
-// Generated from FastAPI app.openapi() components.schemas for KSAT-40.
-// Edit server/api/schemas.py and regenerate when the API changes.
+// Generated from FastAPI app.openapi() components.schemas.
+
+export interface ApiError {
+  code: string;
+  message: string;
+}
 
 export interface Challenge {
   challenge_id: string;
@@ -14,19 +18,18 @@ export interface ChallengeList {
   progress: Progress;
 }
 
-export interface Check {
-  field: string;
-  passed: boolean;
-  message: string;
-}
-
-export interface HTTPValidationError {
-  detail?: (ValidationError)[];
+export interface ErrorResponse {
+  error: ApiError;
 }
 
 export interface Progress {
   completed_challenge_ids: (string)[];
 }
+
+export interface ResetProgressRequest {
+  confirm: "RESET DEMO PROGRESS";
+}
+
 
 export interface ReadyBrief {
   scenario_id: string;
@@ -45,6 +48,10 @@ export interface StationSetup {
   receive_frequency_hz: number;
   receive_mode: string;
   tracking_enabled: boolean;
+}
+
+export interface HTTPValidationError {
+  detail?: (ValidationError)[];
 }
 
 export interface ValidationError {

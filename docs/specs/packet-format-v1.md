@@ -2,13 +2,13 @@
 
 ## Read this for packet work
 
-KSAT-10 builds the encoder/decoder under `server/sim/`; the Hello work exposes the public helper in `player/python/kss_client.py`. The simulation folder is currently a placeholder. Other contributors usually only need the [plain-language contract](#plain-language-contract).
+KSAT-10 built the encoder/decoder in `server/sim/packet.py`, with the checksum in `server/sim/crc.py` and the 18-byte state layout in `server/sim/state.py`. These three files use only the Python standard library, so the Hello work can reuse them when it exposes the public helper in `player/python/kss_client.py`. Other contributors usually only need the [plain-language contract](#plain-language-contract).
 
 Use the tables as the exact byte agreement between sender and receiver. **Hexadecimal** is base-16 notation (`0x10` is decimal 16); **offset** counts bytes from the start of the named structure, beginning at zero. **Big-endian** puts the most significant byte first. **CRC** is a checksum that detects changes, not proof of who sent a packet.
 
 Implementation order: read [envelope and limits](#envelope-and-limits), implement one PING using the [worked example](#worked-hello-satellite-exchange), then add the other bodies and failure cases. Preserve the exact constants and bytes below. The [glossary](../glossary.md) explains the project names.
 
-This specification defines the accepted packet format to build. It does not describe an existing implementation.
+This specification defines the accepted packet format. When the code and this spec disagree, this spec wins; fix the code.
 
 ## Plain-language contract
 
