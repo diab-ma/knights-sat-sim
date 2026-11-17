@@ -20,6 +20,10 @@ class ResetProgressRequest(BaseModel):
     confirm: Literal["RESET DEMO PROGRESS"]
 
 
+class StartSessionRequest(BaseModel):
+    challenge_id: str = Field(strict=True, min_length=1)
+
+
 class ApiError(BaseModel):
     code: str
     message: str
