@@ -16,6 +16,7 @@ services:
       - managed:/runtime/managed
       - bridge:/runtime/bridge
       - ./server/api:/app/api:ro
+      - ./server/sim:/app/sim:ro
       - ./server/tests:/app/tests:ro
 volumes:
   authored:

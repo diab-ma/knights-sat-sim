@@ -1,4 +1,4 @@
-"""Sim Service: the Python interface FastAPI calls for Hello sessions.
+"""Sim Service: the Python interface for Hello and idle Catch sessions.
 
 Operations follow docs/specs/backend-and-simulation.md#operations-and-data.
 The Software Link is deterministic: ordered, synchronous handoff with no
@@ -11,6 +11,7 @@ from collections.abc import Buffer, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from sim.clock import AsyncioScheduler, Clock, Scheduler, SystemClock, TimerHandle
 from sim.goal import ping_conformance_issue
@@ -25,12 +26,19 @@ from sim.packet import (
     parse_command,
 )
 from sim.satellite import Satellite
-from sim.state import SatelliteState
+from sim.state import Mode, SatelliteState
 
 HELLO = "hello-satellite"
 READY = "ready-for-the-pass"
 CATCH = "catch-and-log"
 TELEMETRY_PERIOD_S = 1.0
+CATCH_INITIAL_STATE = SatelliteState(
+    mode=Mode.NOMINAL,
+    antenna_deployed=True,
+    deploy_count=1,
+    battery_pct=80,
+    uptime_s=600,
+)
 
 
 class SimError(Exception):
@@ -119,6 +127,7 @@ class SubmissionReceipt:
     submission_id: str
     sent_to_link: bool
     refusal: Feedback | None = None
+    feedback: Feedback | None = None
 
 
 @dataclass(frozen=True)
@@ -136,12 +145,21 @@ class GoalEvidence:
 
 
 @dataclass(frozen=True)
+class PassSnapshot:
+    pass_run_id: str
+    status: Literal["not_started", "running", "finished", "interrupted"]
+    receiver_ready: bool
+    received_count: int
+
+
+@dataclass(frozen=True)
 class SimSnapshot:
     session_id: str
     challenge_id: str
     state: SatelliteState
     history: tuple[HistoryEntry, ...]
     goal: GoalEvidence
+    pass_view: PassSnapshot | None = None
 
 
 @dataclass
@@ -153,9 +171,12 @@ class _PendingDelivery:
     receiver_ids: set[str]
 
 
-class _HelloSession:
-    def __init__(self, session_id: str, now: float) -> None:
+class _Session:
+    def __init__(self, session_id: str, challenge_id: str, now: float) -> None:
         self.session_id = session_id
+        self.challenge_id = challenge_id
+        self.pass_run_id = str(uuid.uuid4()) if challenge_id == CATCH else None
+        self.pass_state = CATCH_INITIAL_STATE if challenge_id == CATCH else None
         self.satellite = Satellite(now)
         self.downlink_sequence = SequenceCounter()
         self.history: list[HistoryEntry] = []
@@ -176,7 +197,7 @@ class SimService:
         self._clock = clock or SystemClock()
         self._scheduler = scheduler or AsyncioScheduler()
         self._lock = threading.RLock()
-        self._session: _HelloSession | None = None
+        self._session: _Session | None = None
         self._handing_off = False
 
     def start(self, session_id: str, challenge_id: str) -> SimSnapshot:
@@ -192,13 +213,12 @@ class SimService:
                 raise SessionActive("A Sim session is already running")
             if challenge_id == READY:
                 raise UnsupportedChallenge("Ready for the Pass has no simulator")
-            if challenge_id == CATCH:
-                raise UnsupportedChallenge("The Catch pass is not built yet (KSAT-20)")
-            if challenge_id != HELLO:
+            if challenge_id not in (HELLO, CATCH):
                 raise UnsupportedChallenge(f"Unknown Challenge {challenge_id!r}")
-            session = _HelloSession(session_id, self._clock.monotonic())
+            session = _Session(session_id, challenge_id, self._clock.monotonic())
             # Schedule before taking the slot so a failure leaves none running.
-            self._schedule_telemetry(session)
+            if challenge_id == HELLO:
+                self._schedule_telemetry(session)
             self._session = session
             return self._snapshot(session)
 
@@ -230,6 +250,8 @@ class SimService:
         with self._lock:
             self._refuse_reentry()
             session = self._require(session_id)
+            if session.challenge_id != HELLO:
+                raise UnsupportedChallenge("Catch is receive-only")
             submission_id = str(uuid.uuid4())
 
             if len(data) > MAX_PACKET_BYTES:
@@ -238,13 +260,14 @@ class SimService:
                 return SubmissionReceipt(submission_id, False, refusal)
 
             parsed = parse_command(data)
+            feedback = None
             if isinstance(parsed, Unreadable):
                 feedback = _feedback(parsed)
                 self._record_uplink(session, data, submission_id, True, feedback)
             else:
                 self._record_uplink(session, data, submission_id, True, None)
                 self._execute(session, parsed, submission_id)
-            return SubmissionReceipt(submission_id, True)
+            return SubmissionReceipt(submission_id, True, feedback=feedback)
 
     def read(self) -> SimSnapshot | None:
         """A copy of current state, history and goal evidence."""
@@ -268,6 +291,8 @@ class SimService:
         """
         with self._lock:
             session = self._require(session_id)
+            if session.challenge_id == CATCH and session.receivers:
+                raise SimError("Catch permits only one receiver")
             receiver_id = str(uuid.uuid4())
             session.receivers[receiver_id] = receiver
             return receiver_id
@@ -317,7 +342,7 @@ class SimService:
         if self._handing_off:
             raise Reentry("Receivers must enqueue packets, not call back into the Sim")
 
-    def _require(self, session_id: str) -> _HelloSession:
+    def _require(self, session_id: str) -> _Session:
         session = self._session
         if session is None:
             raise NoSession("No Sim session is running")
@@ -326,7 +351,7 @@ class SimService:
         return session
 
     def _execute(
-        self, session: _HelloSession, command: CommandPacket, submission_id: str
+        self, session: _Session, command: CommandPacket, submission_id: str
     ) -> None:
         status, state = session.satellite.execute(command, self._clock.monotonic())
         reply = encode_reply(
@@ -342,9 +367,7 @@ class SimService:
             if issue is None:
                 conforming = True
             else:
-                session.goal_notes.append(
-                    GoalNote(submission_id, issue, issue.message)
-                )
+                session.goal_notes.append(GoalNote(submission_id, issue, issue.message))
         self._downlink(
             session,
             reply,
@@ -353,13 +376,13 @@ class SimService:
             goal_submission_id=submission_id if conforming else None,
         )
 
-    def _schedule_telemetry(self, session: _HelloSession) -> None:
+    def _schedule_telemetry(self, session: _Session) -> None:
         delay = session.next_telemetry_at - self._clock.monotonic()
         session.timer = self._scheduler.call_later(
             max(0.0, delay), lambda: self._emit_telemetry(session)
         )
 
-    def _emit_telemetry(self, session: _HelloSession) -> None:
+    def _emit_telemetry(self, session: _Session) -> None:
         with self._lock:
             if self._session is not session:
                 return
@@ -371,7 +394,7 @@ class SimService:
 
     def _downlink(
         self,
-        session: _HelloSession,
+        session: _Session,
         packet: bytes,
         kind: PacketKind,
         submission_id: str | None,
@@ -414,7 +437,7 @@ class SimService:
 
     def _record_uplink(
         self,
-        session: _HelloSession,
+        session: _Session,
         data: bytes,
         submission_id: str,
         sent_to_link: bool,
@@ -433,16 +456,30 @@ class SimService:
             )
         )
 
-    def _snapshot(self, session: _HelloSession) -> SimSnapshot:
+    def _snapshot(self, session: _Session) -> SimSnapshot:
         return SimSnapshot(
             session_id=session.session_id,
-            challenge_id=HELLO,
-            state=session.satellite.snapshot(self._clock.monotonic()),
+            challenge_id=session.challenge_id,
+            state=(
+                session.pass_state
+                if session.pass_state is not None
+                else session.satellite.snapshot(self._clock.monotonic())
+            ),
             history=tuple(session.history),
             goal=GoalEvidence(
                 goal_reached=session.goal_submission_id is not None,
                 submission_id=session.goal_submission_id,
                 notes=tuple(session.goal_notes),
+            ),
+            pass_view=(
+                None
+                if session.pass_run_id is None
+                else PassSnapshot(
+                    pass_run_id=session.pass_run_id,
+                    status="not_started",
+                    receiver_ready=bool(session.receivers),
+                    received_count=0,
+                )
             ),
         )
 

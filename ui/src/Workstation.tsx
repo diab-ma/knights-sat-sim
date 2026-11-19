@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useParams } from "react-router";
+import { ResetProgress } from "@/ResetProgress";
 import {
   BookOpen,
   FileCode,
@@ -153,6 +154,7 @@ export function Workstation() {
               </h2>
               <p>No Workspace is connected.</p>
             </section>
+            <ResetProgress />
             {import.meta.env.DEV && (
               <Link className="developer-link" to="/dev/components">
                 Component examples
