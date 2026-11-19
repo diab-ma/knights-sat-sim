@@ -36,6 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import TerminalPanel from "@/features/terminal/TerminalPanel";
 
 export default function ComponentExamples() {
   const [name, setName] = useState("");
@@ -50,6 +51,10 @@ export default function ComponentExamples() {
         Local examples only. These controls do not create a session or save
         files.
       </p>
+      <section className="space-y-4">
+        <h2>Terminal</h2>
+        <TerminalPanel />
+      </section>
       <section className="space-y-4">
         <h2>Button, Input, Label and Select</h2>
         <form

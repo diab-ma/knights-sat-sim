@@ -281,6 +281,28 @@
   overflow: auto;
   background: var(--background);
 }
+.workspace-tabs > .terminal-workspace {
+  display: flex;
+  overflow: hidden;
+}
+.terminal-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 240px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  background: var(--background);
+}
+.terminal-panel > div {
+  height: 100%;
+}
+.terminal-panel .xterm {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 12px;
+}
 .workspace-empty {
   min-height: 100%;
   display: flex;
